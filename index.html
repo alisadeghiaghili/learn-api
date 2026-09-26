@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LearnAPI — Interactive API Tutorial</title>
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="chrome">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-name">LearnAPI</span>
+        <span class="brand-tag">FastAPI · plumber · OpenAPI</span>
+      </div>
+      <nav class="tracks" id="track-nav" aria-label="Tracks"></nav>
+      <div class="chrome-actions">
+        <button type="button" class="btn ghost" id="btn-levels">Levels</button>
+        <button type="button" class="btn ghost" id="btn-hint">Hint</button>
+        <button type="button" class="btn ghost" id="btn-undo">Undo</button>
+        <button type="button" class="btn ghost" id="btn-reset">Reset</button>
+        <div class="golf" id="golf-badge" title="Command golf">par —</div>
+      </div>
+    </header>
+
+    <main class="stage">
+      <aside class="rail left" id="level-rail">
+        <div class="rail-head">
+          <h2>Sequences</h2>
+          <span class="muted" id="level-count"></span>
+        </div>
+        <div id="sequence-list"></div>
+      </aside>
+
+      <section class="center">
+        <div class="viz-wrap">
+          <div class="viz-tabs" role="tablist">
+            <button type="button" class="viz-tab active" data-viz="pipeline" role="tab">Pipeline</button>
+            <button type="button" class="viz-tab" data-viz="surface" role="tab">API Surface</button>
+          </div>
+          <div id="viz-pipeline" class="viz-panel"></div>
+          <div id="viz-surface" class="viz-panel hidden"></div>
+        </div>
+        <div class="editor-wrap">
+          <div class="editor-head">
+            <label for="code-editor" id="editor-label">server.py</label>
+            <div class="editor-actions">
+              <span class="muted" id="editor-status"></span>
+              <button type="button" class="btn primary" id="btn-run">Run</button>
+            </div>
+          </div>
+          <textarea id="code-editor" class="code-editor" spellcheck="false" wrap="off"></textarea>
+        </div>
+      </section>
+
+      <aside class="rail right">
+        <div class="panel-openapi">
+          <div class="rail-head">
+            <h2>OpenAPI</h2>
+            <button type="button" class="btn ghost sm" id="btn-openapi-dump">Dump</button>
+          </div>
+          <pre id="openapi-view" class="code-block"></pre>
+        </div>
+        <div class="panel-console">
+          <div class="rail-head">
+            <h2>Console</h2>
+            <span class="muted">call GET /path</span>
+          </div>
+          <div id="console-log" class="console-log" aria-live="polite"></div>
+          <form id="console-form" class="console-form" autocomplete="off">
+            <span class="prompt">$</span>
+            <input id="console-input" type="text" aria-label="Command" placeholder="help" />
+          </form>
+        </div>
+      </aside>
+    </main>
+
+    <div id="dialog-root" class="dialog-root hidden" role="dialog" aria-modal="true"></div>
+    <div id="toast" class="toast hidden" role="status"></div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

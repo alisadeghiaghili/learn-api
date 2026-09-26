@@ -1,0 +1,10 @@
+{
+  "name": "learn-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Interactive API tutorial game for FastAPI, plumber, and OpenAPI",
+  "type": "module",
+  "scripts": {
+    "test": "node tests/engine.test.mjs && node tests/levels.test.mjs"
+  }
+}
