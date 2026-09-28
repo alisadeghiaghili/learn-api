@@ -28,7 +28,7 @@ const HELP = `commands
   levels               browse levels
   hint                 level hint
   run                  compile editor code into the mock server
-  call <METHOD> <path> [body=JSON]
+  call <METHOD> <path> [body=JSON] [headers=JSON]
                        send a request, e.g. call GET /users
   openapi              print OpenAPI JSON
   goal                 show level goals
@@ -43,28 +43,42 @@ const HELP = `commands
  * Parse a `call` command line into a request object.
  *
  * @param {string} rest
- * @returns {{ method: string, path: string, body?: unknown } | { error: string }}
+ * @returns {{ method: string, path: string, body?: unknown, headers?: Record<string, string> } | { error: string }}
  */
 export function parseCall(rest) {
-  const bodyIdx = rest.search(/\bbody\s*=/);
-  let head = rest;
   let body;
-  if (bodyIdx >= 0) {
-    head = rest.slice(0, bodyIdx).trim();
-    const bodyRaw = rest.slice(bodyIdx).replace(/^\bbody\s*=\s*/, '').trim();
-    try {
-      body = JSON.parse(bodyRaw);
-    } catch {
-      return { error: `body is not valid JSON: ${bodyRaw}` };
+  let headers;
+  let head = rest;
+
+  const bodyIdx = rest.search(/\bbody\s*=/);
+  const headersIdx = rest.search(/\bheaders\s*=/);
+
+  if (bodyIdx >= 0 || headersIdx >= 0) {
+    const cuts = [bodyIdx, headersIdx].filter((i) => i >= 0).sort((a, b) => a - b);
+    head = rest.slice(0, cuts[0]).trim();
+    for (let i = 0; i < cuts.length; i++) {
+      const start = cuts[i];
+      const end = i + 1 < cuts.length ? cuts[i + 1] : rest.length;
+      const chunk = rest.slice(start, end).trim();
+      const isBody = chunk.startsWith('body');
+      const raw = chunk.replace(/^body\s*=\s*/, '').replace(/^headers\s*=\s*/, '').trim();
+      try {
+        const parsed = JSON.parse(raw);
+        if (isBody) body = parsed;
+        else headers = parsed;
+      } catch {
+        return { error: `${isBody ? 'body' : 'headers'} is not valid JSON: ${raw}` };
+      }
     }
   }
+
   const parts = head.trim().split(/\s+/);
   if (parts.length < 2) {
-    return { error: 'usage: call <METHOD> <path> [body=JSON]' };
+    return { error: 'usage: call <METHOD> <path> [body=JSON] [headers=JSON]' };
   }
   const method = parts[0].toUpperCase();
   const path = parts[1].startsWith('/') ? parts[1] : `/${parts[1]}`;
-  return { method, path, body };
+  return { method, path, body, headers };
 }
 
 /**

@@ -131,5 +131,56 @@ assert(!matchRoute(app.routes, 'DELETE', '/users'), 'matchRoute miss method');
 const rendered = renderHandlerBody('return {"id": user_id, "name": "ada"}', { user_id: 9 });
 assert(rendered && rendered.id === 9, 'renderHandlerBody');
 
+console.log('auth / di / errors');
+const adv = parseSource(
+  `
+from fastapi import FastAPI, Depends, Header, HTTPException
+
+app = FastAPI(title="Adv")
+
+def get_settings():
+    return {"app_name": "LearnAPI", "debug": False}
+
+@app.get("/info")
+def info(settings: dict = Depends(get_settings)):
+    return {"app": settings["app_name"], "debug": settings["debug"]}
+
+@app.get("/items/{item_id}")
+def get_item(item_id: int):
+    if item_id == 99:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return {"id": item_id}
+
+@app.get("/admin")
+def admin(api_key: str = Header(...)):
+    return {"ok": True, "who": "admin"}
+`,
+  'python'
+);
+assert(adv.dependencies.get_settings && adv.dependencies.get_settings.app_name === 'LearnAPI', 'dep provider');
+assert(adv.routes.find((r) => r.handlerName === 'info')?.deps?.includes('get_settings'), 'Depends parsed');
+assert(adv.routes.find((r) => r.handlerName === 'admin')?.headers?.api_key, 'Header parsed');
+assert(adv.routes.find((r) => r.handlerName === 'get_item')?.raises?.some((x) => x.status === 404), 'raise parsed');
+
+const info = executeRequest(adv, { method: 'GET', path: '/info' });
+assert(info.status === 200 && info.body.app === 'LearnAPI', `DI bind ${JSON.stringify(info.body)}`);
+
+const hit404 = executeRequest(adv, { method: 'GET', path: '/items/99' });
+assert(hit404.status === 404, `HTTPException 404 (got ${hit404.status})`);
+const hit200 = executeRequest(adv, { method: 'GET', path: '/items/1' });
+assert(hit200.status === 200, 'item 1 still 200');
+
+const noAuth = executeRequest(adv, { method: 'GET', path: '/admin' });
+assert(noAuth.status === 401, `missing key 401 (got ${noAuth.status})`);
+const authed = executeRequest(adv, {
+  method: 'GET',
+  path: '/admin',
+  headers: { 'X-API-Key': 'secret' },
+});
+assert(authed.status === 200, `with key 200 (got ${authed.status})`);
+
+const advDoc = generateOpenAPI(adv);
+assert(openApiHas(advDoc, 'components.securitySchemes.apiKeyAuth'), 'securitySchemes');
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

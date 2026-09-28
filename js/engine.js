@@ -24,8 +24,12 @@
  * @property {string|null} summary
  * @property {string|null} tag
  * @property {Record<string, {type: string, required: boolean, example?: unknown}>} query
+ * @property {Record<string, {type: string, required: boolean, alias?: string}>} headers
+ * @property {string[]} deps
+ * @property {{status: number, detail: string, ifParam?: string, ifEquals?: string|number}[]} raises
  * @property {{type: string, required: boolean, example?: unknown}|null} body
  * @property {string|null} bodyModel
+ * @property {string|null} responseModel
  */
 
 /**
@@ -36,6 +40,7 @@
  * @property {Route[]} routes
  * @property {string[]} errors
  * @property {Record<string, object>} models
+ * @property {Record<string, unknown>} dependencies
  */
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
@@ -107,6 +112,8 @@ function parseLiteral(text) {
     .replace(/\bNA\b/g, 'null')
     .replace(/\bTRUE\b/g, 'true')
     .replace(/\bFALSE\b/g, 'false')
+    // settings["app_name"] → settings.app_name (bound via Deps)
+    .replace(/([A-Za-z_][A-Za-z0-9_]*)\s*\[\s*['"]([^'"]+)['"]\s*\]/g, '$1.$2')
     // single quotes → double
     .replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (_, s) => JSON.stringify(s))
     // Python/R keyword keys: name: / name = (also right after ( or [)
@@ -272,13 +279,17 @@ function bindValue(value, bindings) {
     if (Object.prototype.hasOwnProperty.call(bindings, value)) {
       return bindings[value];
     }
-    // Pydantic-style `user.name` / R `body$name` → bindings
+    // Pydantic-style `user.name` / R `body$name` / `settings.app_name` → bindings
     const attr = value.match(/^(\w+)[.$](\w+)$/);
     if (attr) {
       const key = `${attr[1]}.${attr[2]}`;
       if (Object.prototype.hasOwnProperty.call(bindings, key)) return bindings[key];
       if (Object.prototype.hasOwnProperty.call(bindings, attr[2])) return bindings[attr[2]];
       if (Object.prototype.hasOwnProperty.call(bindings, value)) return bindings[value];
+      const bag = bindings[attr[1]];
+      if (bag && typeof bag === 'object' && !Array.isArray(bag) && attr[2] in bag) {
+        return bag[attr[2]];
+      }
     }
     return value.replace(/\{(\w+)\}/g, (m, k) =>
       bindings[k] !== undefined ? String(bindings[k]) : m
@@ -309,6 +320,7 @@ function parsePython(source) {
     routes: [],
     errors: [],
     models: {},
+    dependencies: {},
   };
 
   const titleMatch = source.match(/FastAPI\s*\(([^)]*)\)/);
@@ -340,6 +352,23 @@ function parsePython(source) {
     app.models[name] = fields;
   }
 
+  // Dependency providers: def get_settings(): return {...}
+  const depRe = /def\s+([A-Za-z_]\w*)\s*\(\s*\)\s*:\n([\s\S]*?)(?=\n@|\ndef\s|\nasync\s|\nclass\s|$)/g;
+  let dm;
+  while ((dm = depRe.exec(source))) {
+    const name = dm[1];
+    const body = dm[2];
+    if (/@app\./.test(source.slice(Math.max(0, dm.index - 80), dm.index))) continue;
+    const lit = extractReturnLiteral(body);
+    if (lit) {
+      try {
+        app.dependencies[name] = parseLiteral(lit);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
   const routeRe = /@app\.(get|post|put|patch|delete)\s*\(\s*(['"])([^'"]+)\2([^)]*)\)/g;
   let rm;
   while ((rm = routeRe.exec(source))) {
@@ -347,10 +376,18 @@ function parsePython(source) {
     const path = normalizePathParams(rm[3]);
     const args = rm[4] || '';
     const after = source.slice(rm.index + rm[0].length);
-    const defMatch = after.match(/^\s*(?:async\s+)?def\s+(\w+)\s*\(([^)]*)\)\s*(?:->\s*[^:]+)?\s*:\n([\s\S]*?)(?=\n@|\ndef\s|\nasync\s|\nclass\s|$)/);
-    const handlerName = defMatch ? defMatch[1] : 'handler';
-    const paramsRaw = defMatch ? defMatch[2] : '';
-    const bodyRaw = defMatch ? defMatch[3] : '';
+    const defHead = after.match(/^\s*(?:async\s+)?def\s+(\w+)\s*\(/);
+    const handlerName = defHead ? defHead[1] : 'handler';
+    let paramsRaw = '';
+    let bodyRaw = '';
+    if (defHead) {
+      const parenStart = after.indexOf('(', defHead.index + defHead[0].length - 1);
+      const paramsBlock = extractBracesOrParens(after, parenStart);
+      paramsRaw = paramsBlock.slice(1, -1);
+      const afterParams = after.slice(parenStart + paramsBlock.length);
+      const bodyM = afterParams.match(/^\s*(?:->\s*[^:]+)?\s*:\n([\s\S]*?)(?=\n@|\ndef\s|\nasync\s|\nclass\s|$)/);
+      bodyRaw = bodyM ? bodyM[1] : '';
+    }
 
     /** @type {Record<string, string>} */
     const pathParams = {};
@@ -368,6 +405,10 @@ function parsePython(source) {
 
     /** @type {Record<string, {type: string, required: boolean}>} */
     const query = {};
+    /** @type {Record<string, {type: string, required: boolean, alias?: string}>} */
+    const headers = {};
+    /** @type {string[]} */
+    const deps = [];
     let body = null;
     let bodyModel = null;
 
@@ -383,6 +424,28 @@ function parsePython(source) {
         if (nm[2]) pathParams[name] = type;
         continue;
       }
+      // Depends(get_settings) → dependency, not a client field
+      const dep = (def || type || '').match(/Depends\s*\(\s*([A-Za-z_][\w]*)\s*\)/);
+      if (dep) {
+        deps.push(dep[1]);
+        continue;
+      }
+      // Header(...) / Header("X-API-Key") → required HTTP header
+      const hdr = (def || type || '').match(/Header\s*\(\s*([.A-Za-z_]|'[^']*'|"[^"]*")/);
+      if (hdr || /Header\b/.test(type) || /Header\b/.test(def || '')) {
+        let alias = name.replace(/_/g, '-');
+        const aliasStr = (def || '').match(/Header\s*\(\s*['"]([^'"]+)['"]/);
+        if (aliasStr) alias = aliasStr[1];
+        if (/api_key|apikey|token/i.test(name) && !aliasStr) {
+          alias = name.replace(/_/g, '-');
+        }
+        headers[name] = {
+          type: 'str',
+          required: !/Optional|None/.test(type) && !/=\s*None/.test(def || ''),
+          alias,
+        };
+        continue;
+      }
       if (Object.keys(app.models).includes(type) || /BaseModel|User|Item|Create|Request/.test(type)) {
         body = { type, required: def === undefined };
         bodyModel = type;
@@ -396,6 +459,30 @@ function parsePython(source) {
     if (sc) status = parseInt(sc[1], 10);
     const summary = (args.match(/summary\s*=\s*['"]([^'"]+)['"]/) || [])[1] || null;
     const tag = (args.match(/tags\s*=\s*\[\s*['"]([^'"]+)['"]\s*\]/) || [])[1] || null;
+    const responseModel =
+      (args.match(/response_model\s*=\s*([A-Za-z_][\w]*)/) || [])[1] || null;
+
+    const raises = [];
+    const raiseRe =
+      /if\s+(\w+)\s*==\s*(['"]?)([^'"\n:]+)\2\s*:\s*\n\s*raise\s+HTTPException\(\s*status_code\s*=\s*(\d{3})/g;
+    let raiseM;
+    while ((raiseM = raiseRe.exec(bodyRaw))) {
+      const raw = raiseM[3].trim();
+      raises.push({
+        status: parseInt(raiseM[4], 10),
+        detail: 'error',
+        ifParam: raiseM[1],
+        ifEquals: /^-?\d+$/.test(raw) ? Number(raw) : raw,
+      });
+    }
+    // Any HTTPException without a simple if — still counts for codeContains / docs
+    if (/HTTPException\s*\(/.test(bodyRaw) && !raises.length) {
+      const st = bodyRaw.match(/HTTPException\(\s*status_code\s*=\s*(\d{3})/);
+      raises.push({
+        status: st ? parseInt(st[1], 10) : 400,
+        detail: (bodyRaw.match(/detail\s*=\s*['"]([^'"]+)['"]/) || [])[1] || 'error',
+      });
+    }
 
     app.routes.push({
       method: /** @type {HttpMethod} */ (method),
@@ -407,8 +494,12 @@ function parsePython(source) {
       summary,
       tag,
       query,
+      headers,
+      deps,
+      raises,
       body,
       bodyModel,
+      responseModel,
     });
   }
 
@@ -457,6 +548,7 @@ function parseR(source) {
     routes: [],
     errors: [],
     models: {},
+    dependencies: {},
   };
 
   const title = source.match(/#\*\s*@apiTitle\s+(.+)/);
@@ -518,8 +610,12 @@ function parseR(source) {
       summary,
       tag,
       query,
+      headers: {},
+      deps: [],
+      raises: [],
       body,
       bodyModel: null,
+      responseModel: null,
     });
   }
 
@@ -617,9 +713,10 @@ function coerce(raw, type) {
  * @param {Record<string, string>} pathParams
  * @param {Record<string, string>} query
  * @param {unknown} body
+ * @param {ParsedApp} [parsedApp]
  * @returns {Record<string, unknown>}
  */
-function buildBindings(route, pathParams, query, body) {
+function buildBindings(route, pathParams, query, body, parsedApp) {
   /** @type {Record<string, unknown>} */
   const b = {};
   for (const [k, v] of Object.entries(pathParams)) {
@@ -634,6 +731,21 @@ function buildBindings(route, pathParams, query, body) {
       b[`body.${k}`] = v;
     }
   }
+  // Inject Depends() providers (mock FastAPI DI)
+  if (parsedApp?.dependencies && route.deps?.length) {
+    for (const dep of route.deps) {
+      const val = parsedApp.dependencies[dep];
+      if (val && typeof val === 'object' && !Array.isArray(val)) {
+        Object.assign(b, val);
+        b[dep] = val;
+        for (const [k, v] of Object.entries(val)) {
+          b[`${dep}.${k}`] = v;
+        }
+      } else if (val !== undefined) {
+        b[dep] = val;
+      }
+    }
+  }
   return b;
 }
 
@@ -641,7 +753,7 @@ function buildBindings(route, pathParams, query, body) {
  * Execute a mock request against a parsed app.
  *
  * @param {ParsedApp} parsed
- * @param {{ method: HttpMethod|string, path: string, query?: Record<string, string>, body?: unknown }} req
+ * @param {{ method: HttpMethod|string, path: string, query?: Record<string, string>, body?: unknown, headers?: Record<string, string> }} req
  * @returns {{ status: number, ok: boolean, headers: Record<string, string>, body: unknown, matched: Route|null, params: Record<string, string>, error?: string }}
  */
 export function executeRequest(parsed, req) {
@@ -652,6 +764,11 @@ export function executeRequest(parsed, req) {
   const query = { ...(req.query || {}) };
   if (qs) {
     for (const [k, v] of new URLSearchParams(qs)) query[k] = v;
+  }
+  /** @type {Record<string, string>} */
+  const reqHeaders = {};
+  for (const [k, v] of Object.entries(req.headers || {})) {
+    reqHeaders[k.toLowerCase()] = v;
   }
 
   const hit = matchRoute(parsed.routes, method, pathname);
@@ -667,9 +784,52 @@ export function executeRequest(parsed, req) {
     };
   }
 
-  const bindings = buildBindings(hit.route, hit.params, query, req.body);
+  // Required Header(...) params — mock auth gate
+  for (const [name, meta] of Object.entries(hit.route.headers || {})) {
+    if (!meta.required) continue;
+    const alias = (meta.alias || name).toLowerCase();
+    const present =
+      reqHeaders[alias] !== undefined ||
+      reqHeaders[name.toLowerCase()] !== undefined ||
+      reqHeaders['x-api-key'] !== undefined && /api[_-]?key|token/i.test(name);
+    if (!present) {
+      return {
+        status: 401,
+        ok: false,
+        headers: { 'content-type': 'application/json' },
+        body: { detail: `Missing required header ${meta.alias || name}` },
+        matched: hit.route,
+        params: hit.params,
+        error: 'auth',
+      };
+    }
+  }
+
+  const bindings = buildBindings(hit.route, hit.params, query, req.body, parsed);
   const template = parseLiteral(extractReturnLiteral(hit.route.source));
   const bound = bindValue(template, bindings);
+
+  // Simple `if param == value: raise HTTPException(status_code=N)`
+  for (const rule of hit.route.raises || []) {
+    if (rule.ifParam === undefined) continue;
+    const actual =
+      hit.params[rule.ifParam] !== undefined
+        ? coerce(hit.params[rule.ifParam], hit.route.params[rule.ifParam])
+        : query[rule.ifParam] !== undefined
+          ? coerce(query[rule.ifParam], hit.route.query[rule.ifParam]?.type)
+          : bindings[rule.ifParam];
+    if (String(actual) === String(rule.ifEquals)) {
+      return {
+        status: rule.status,
+        ok: false,
+        headers: { 'content-type': 'application/json' },
+        body: { detail: rule.detail || 'error' },
+        matched: hit.route,
+        params: hit.params,
+        error: 'http_exception',
+      };
+    }
+  }
 
   // Simulate missing required path typing lightly
   for (const [k, t] of Object.entries(hit.route.params)) {

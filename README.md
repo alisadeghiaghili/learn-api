@@ -36,6 +36,7 @@ No build step. No backend. 100% client-side.
 | `run` | Compile current editor code into the mock server |
 | `call GET /users` | Send a request |
 | `call POST /users body={"name":"ada"}` | Send with JSON body |
+| `call GET /admin headers={"X-API-Key":"secret"}` | Send with headers |
 | `openapi` | Print the generated OpenAPI document |
 | `undo` / `reset` | Undo last run / reset level |
 | `solution` | Show solution code (counts as a fail for golf) |

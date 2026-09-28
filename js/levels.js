@@ -20,7 +20,7 @@
  * @property {number} golf
  * @property {string} startCode
  * @property {string} solutionCode
- * @property {{ endpoints?: {method: string, path: string, status?: number}[], calls?: {method: string, path: string, body?: object, expectStatus: number, expectBody?: object}[], codeContains?: string[], openapiHas?: string[] }} goal
+ * @property {{ endpoints?: {method: string, path: string, status?: number}[], calls?: {method: string, path: string, body?: object, headers?: Record<string, string>, expectStatus: number, expectBody?: object}[], codeContains?: string[], openapiHas?: string[] }} goal
  * @property {object[]} startDialog
  * @property {string} [editorLabel]
  */
@@ -338,6 +338,296 @@ def delete_note(note_id: int):
           '## Status codes',
           '200 OK · 201 Created · 204 No Content · 404 Not Found · 422 Validation Error',
           'Tell clients what happened with the status code. `DELETE` that succeeds is often **204** with an empty body.',
+        ],
+      },
+      { type: 'GoalList' },
+    ],
+  },
+
+  {
+    id: 'fastapi-05',
+    track: 'fastapi',
+    language: 'python',
+    name: 'CRUD on one resource',
+    hint: 'One path `/notes/{note_id}` with GET, PUT, DELETE — plus POST /notes to create.',
+    golf: 5,
+    editorLabel: 'main.py',
+    startCode: `from fastapi import FastAPI
+
+app = FastAPI(title="Notes")
+
+@app.get("/notes")
+def list_notes():
+    return {"notes": []}
+
+# POST /notes → 201
+# GET /notes/{note_id}
+# PUT /notes/{note_id}
+# DELETE /notes/{note_id} → 204
+`,
+    solutionCode: `from fastapi import FastAPI
+
+app = FastAPI(title="Notes")
+
+@app.get("/notes")
+def list_notes():
+    return {"notes": []}
+
+@app.post("/notes", status_code=201)
+def create_note():
+    return {"id": 1, "title": "hello"}
+
+@app.get("/notes/{note_id}")
+def get_note(note_id: int):
+    return {"id": note_id, "title": "hello"}
+
+@app.put("/notes/{note_id}")
+def update_note(note_id: int):
+    return {"id": note_id, "title": "updated"}
+
+@app.delete("/notes/{note_id}", status_code=204)
+def delete_note(note_id: int):
+    return {}
+`,
+    goal: {
+      endpoints: [
+        { method: 'GET', path: '/notes' },
+        { method: 'POST', path: '/notes', status: 201 },
+        { method: 'GET', path: '/notes/{note_id}' },
+        { method: 'PUT', path: '/notes/{note_id}' },
+        { method: 'DELETE', path: '/notes/{note_id}', status: 204 },
+      ],
+      calls: [
+        { method: 'POST', path: '/notes', expectStatus: 201 },
+        { method: 'GET', path: '/notes/3', expectStatus: 200, expectBody: { id: 3 } },
+        { method: 'PUT', path: '/notes/3', expectStatus: 200 },
+        { method: 'DELETE', path: '/notes/3', expectStatus: 204 },
+      ],
+    },
+    startDialog: [
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## CRUD',
+          'A resource is not a single route. **C**reate `POST` · **R**ead `GET` · **U**pdate `PUT` · **D**elete `DELETE`.',
+          'Same path `/notes/{note_id}` for read/update/delete; collection path `/notes` for list/create.',
+          'This is the shape every service tutorial builds toward — including FastAPI projects with SQLAlchemy.',
+        ],
+      },
+      { type: 'GoalList' },
+    ],
+  },
+  {
+    id: 'fastapi-06',
+    track: 'fastapi',
+    language: 'python',
+    name: 'HTTPException for missing resources',
+    hint: 'Raise `HTTPException(status_code=404)` when `item_id == 99`.',
+    golf: 3,
+    editorLabel: 'main.py',
+    startCode: `from fastapi import FastAPI, HTTPException
+
+app = FastAPI(title="Store")
+
+@app.get("/items/{item_id}")
+def get_item(item_id: int):
+    return {"id": item_id}
+
+# When item_id == 99, raise HTTPException 404
+`,
+    solutionCode: `from fastapi import FastAPI, HTTPException
+
+app = FastAPI(title="Store")
+
+@app.get("/items/{item_id}")
+def get_item(item_id: int):
+    if item_id == 99:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return {"id": item_id}
+`,
+    goal: {
+      endpoints: [{ method: 'GET', path: '/items/{item_id}' }],
+      calls: [
+        { method: 'GET', path: '/items/1', expectStatus: 200, expectBody: { id: 1 } },
+        { method: 'GET', path: '/items/99', expectStatus: 404 },
+      ],
+      codeContains: ['HTTPException', 'status_code=404'],
+    },
+    startDialog: [
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Errors are part of the contract',
+          'A missing resource is **404**, not a stack trace and not a silent `200` with `null`.',
+          'FastAPI signals this with `raise HTTPException(status_code=404, detail="...")`.',
+          'OpenAPI will list 404 under `responses` — that is what clients and Swagger UI show.',
+          'Try `call GET /items/99` after Run.',
+        ],
+      },
+      { type: 'GoalList' },
+    ],
+  },
+  {
+    id: 'fastapi-07',
+    track: 'fastapi',
+    language: 'python',
+    name: 'Dependency injection',
+    hint: 'Define `get_settings()` returning a dict, then `Depends(get_settings)` in the handler.',
+    golf: 3,
+    editorLabel: 'main.py',
+    startCode: `from fastapi import FastAPI, Depends
+
+app = FastAPI(title="Config")
+
+def get_settings():
+    return {"app_name": "LearnAPI", "debug": False}
+
+@app.get("/info")
+def info():
+    return {"app": "unknown"}
+
+# Inject settings via Depends(get_settings)
+`,
+    solutionCode: `from fastapi import FastAPI, Depends
+
+app = FastAPI(title="Config")
+
+def get_settings():
+    return {"app_name": "LearnAPI", "debug": False}
+
+@app.get("/info")
+def info(settings: dict = Depends(get_settings)):
+    return {"app": settings["app_name"], "debug": settings["debug"]}
+`,
+    goal: {
+      endpoints: [{ method: 'GET', path: '/info' }],
+      calls: [{ method: 'GET', path: '/info', expectStatus: 200, expectBody: { app: 'LearnAPI' } }],
+      codeContains: ['Depends', 'get_settings'],
+    },
+    startDialog: [
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Depends',
+          'Handlers should not open DB sessions or parse config by hand. **Dependencies** are callable providers FastAPI injects.',
+          '```\ndef get_settings():\n    return {"app_name": "LearnAPI"}\n\n@app.get("/info")\ndef info(settings: dict = Depends(get_settings)):\n    return {"app": settings["app_name"]}\n```',
+          'This is the backbone of production FastAPI apps — auth, DB, and settings all ride on `Depends`.',
+        ],
+      },
+      { type: 'GoalList' },
+    ],
+  },
+  {
+    id: 'fastapi-08',
+    track: 'fastapi',
+    language: 'python',
+    name: 'API key auth',
+    hint: 'Take `api_key: str = Header(...)` and reject with 401 when it is missing (the mock does that for required headers).',
+    golf: 3,
+    editorLabel: 'main.py',
+    startCode: `from fastapi import FastAPI, Header
+
+app = FastAPI(title="Secure API")
+
+@app.get("/public")
+def public():
+    return {"ok": True}
+
+# GET /admin requires header X-API-Key
+`,
+    solutionCode: `from fastapi import FastAPI, Header
+
+app = FastAPI(title="Secure API")
+
+@app.get("/public")
+def public():
+    return {"ok": True}
+
+@app.get("/admin")
+def admin(api_key: str = Header(...)):
+    return {"ok": True, "who": "admin"}
+`,
+    goal: {
+      endpoints: [
+        { method: 'GET', path: '/public' },
+        { method: 'GET', path: '/admin' },
+      ],
+      calls: [
+        { method: 'GET', path: '/public', expectStatus: 200 },
+        { method: 'GET', path: '/admin', expectStatus: 401 },
+        {
+          method: 'GET',
+          path: '/admin',
+          headers: { 'X-API-Key': 'secret' },
+          expectStatus: 200,
+          expectBody: { who: 'admin' },
+        },
+      ],
+      codeContains: ['Header'],
+      openapiHas: ['components.securitySchemes.apiKeyAuth'],
+    },
+    startDialog: [
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Auth as a contract',
+          'API keys are just **headers**. FastAPI declares them with `Header(...)`; OpenAPI advertises `securitySchemes`.',
+          'Swagger UI then shows a lock — that is not decoration, it is the contract clients generate against.',
+          'Without the header the mock returns **401**. With `headers={"X-API-Key":"secret"}` the route answers.',
+        ],
+      },
+      { type: 'GoalList' },
+    ],
+  },
+  {
+    id: 'fastapi-09',
+    track: 'fastapi',
+    language: 'python',
+    name: 'response_model',
+    hint: 'Declare `class UserOut(BaseModel)` and `response_model=UserOut` on the route.',
+    golf: 4,
+    editorLabel: 'main.py',
+    startCode: `from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI(title="Users")
+
+class UserOut(BaseModel):
+    id: int
+    name: str
+
+@app.get("/users/{user_id}")
+def get_user(user_id: int):
+    return {"id": user_id, "name": "ada", "password": "leaked"}
+
+# Use response_model=UserOut so the password leaves the contract
+`,
+    solutionCode: `from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI(title="Users")
+
+class UserOut(BaseModel):
+    id: int
+    name: str
+
+@app.get("/users/{user_id}", response_model=UserOut)
+def get_user(user_id: int):
+    return {"id": user_id, "name": "ada", "password": "leaked"}
+`,
+    goal: {
+      endpoints: [{ method: 'GET', path: '/users/{user_id}' }],
+      codeContains: ['response_model', 'UserOut'],
+      openapiHas: ['components.schemas.UserOut', 'paths./users/{user_id}.get.responses'],
+    },
+    startDialog: [
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## response_model',
+          'What you return and what you **promise** are not the same. `response_model=UserOut` documents the public shape.',
+          'In real FastAPI it also filters extra fields. Here the important lesson is the OpenAPI schema clients trust.',
+          'Look at `components.schemas.UserOut` after Run.',
         ],
       },
       { type: 'GoalList' },

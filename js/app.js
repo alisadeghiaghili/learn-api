@@ -158,7 +158,7 @@ function runCode() {
 }
 
 /**
- * @param {{ method: string, path: string, body?: unknown }} req
+ * @param {{ method: string, path: string, body?: unknown, headers?: Record<string, string> }} req
  */
 function doCall(req) {
   bumpGolf();
@@ -168,7 +168,8 @@ function doCall(req) {
   }
   const res = executeRequest(state.parsed, req);
   state.lastCall = { req, res };
-  print(`→ ${req.method} ${req.path}${req.body ? ` body=${JSON.stringify(req.body)}` : ''}`, 'cmd');
+  const hdr = req.headers ? ` headers=${JSON.stringify(req.headers)}` : '';
+  print(`→ ${req.method} ${req.path}${req.body ? ` body=${JSON.stringify(req.body)}` : ''}${hdr}`, 'cmd');
   print(`← ${res.status}`, res.ok ? 'ok' : 'fail');
   print(JSON.stringify(res.body), res.ok ? 'str' : 'fail');
 
@@ -216,7 +217,12 @@ function checkWin() {
       missing.push(`call ${c.method} ${c.path}`);
       continue;
     }
-    const res = executeRequest(parsed, { method: c.method, path: c.path, body: c.body });
+    const res = executeRequest(parsed, {
+      method: c.method,
+      path: c.path,
+      body: c.body,
+      headers: c.headers,
+    });
     if (res.status !== c.expectStatus) {
       missing.push(`call ${c.method} ${c.path} status ${c.expectStatus} (got ${res.status})`);
       continue;

@@ -39,6 +39,14 @@ export function generateOpenAPI(parsed) {
         schema: { type: openApiType(meta.type) },
       });
     }
+    for (const [name, meta] of Object.entries(route.headers || {})) {
+      parameters.push({
+        name: meta.alias || name.replace(/_/g, '-'),
+        in: 'header',
+        required: !!meta.required,
+        schema: { type: openApiType(meta.type || 'str') },
+      });
+    }
 
     /** @type {object} */
     const responses = {
@@ -46,22 +54,36 @@ export function generateOpenAPI(parsed) {
         description: route.status >= 200 && route.status < 300 ? 'Successful response' : 'Error',
         content: {
           'application/json': {
-            schema: { type: 'object' },
+            schema: route.responseModel
+              ? { $ref: `#/components/schemas/${route.responseModel}` }
+              : { type: 'object' },
           },
         },
       },
     };
+    for (const rule of route.raises || []) {
+      responses[String(rule.status)] = {
+        description: rule.detail || 'Error',
+        content: { 'application/json': { schema: { type: 'object' } } },
+      };
+    }
+
+    const security = Object.keys(route.headers || {}).some((h) =>
+      /api[_-]?key|token|authorization/i.test(h)
+    )
+      ? [{ apiKeyAuth: [] }]
+      : undefined;
 
     if (route.method !== 'GET' && route.method !== 'DELETE') {
       const schemaRef = route.bodyModel && parsed.models[route.bodyModel]
         ? { $ref: `#/components/schemas/${route.bodyModel}` }
         : { type: 'object' };
-      responses[String(route.status)].requestBody = undefined;
       paths[key][route.method.toLowerCase()] = {
         operationId: opId,
         summary: route.summary || route.handlerName,
         tags: route.tag ? [route.tag] : undefined,
         parameters: parameters.length ? parameters : undefined,
+        security,
         requestBody: {
           required: !!(route.body && route.body.required),
           content: {
@@ -78,6 +100,7 @@ export function generateOpenAPI(parsed) {
       summary: route.summary || route.handlerName,
       tags: route.tag ? [route.tag] : undefined,
       parameters: parameters.length ? parameters : undefined,
+      security,
       responses,
     };
   }
@@ -101,6 +124,22 @@ export function generateOpenAPI(parsed) {
     };
   }
 
+  const needsApiKey = parsed.routes.some((r) =>
+    Object.keys(r.headers || {}).some((h) => /api[_-]?key|token/i.test(h))
+  );
+
+  const components = {};
+  if (Object.keys(schemas).length) components.schemas = schemas;
+  if (needsApiKey) {
+    components.securitySchemes = {
+      apiKeyAuth: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-API-Key',
+      },
+    };
+  }
+
   return {
     openapi: '3.0.3',
     info: {
@@ -108,7 +147,7 @@ export function generateOpenAPI(parsed) {
       version: parsed.version,
     },
     paths,
-    components: Object.keys(schemas).length ? { schemas } : undefined,
+    components: Object.keys(components).length ? components : undefined,
   };
 }
 

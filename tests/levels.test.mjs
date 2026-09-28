@@ -45,7 +45,12 @@ for (const level of LEVELS) {
     const hit = matchRoute(parsed.routes, c.method, c.path.split('?')[0]);
     assert(!!hit, `match ${c.method} ${c.path}`);
     if (!hit) continue;
-    const res = executeRequest(parsed, { method: c.method, path: c.path, body: c.body });
+    const res = executeRequest(parsed, {
+      method: c.method,
+      path: c.path,
+      body: c.body,
+      headers: c.headers,
+    });
     assert(res.status === c.expectStatus, `call ${c.method} ${c.path} → ${c.expectStatus} (got ${res.status})`);
     if (c.expectBody) {
       for (const [k, v] of Object.entries(c.expectBody)) {
