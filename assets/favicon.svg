@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="LearnAPI">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#121A2B"/>
+      <stop offset="100%" stop-color="#0A0F1A"/>
+    </linearGradient>
+    <linearGradient id="pulse" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7C6AF7"/>
+      <stop offset="100%" stop-color="#009485"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <rect x="1" y="1" width="62" height="62" rx="13" fill="none" stroke="#1F2A3C" stroke-width="2"/>
+  <!-- pipeline nodes -->
+  <circle cx="16" cy="32" r="5" fill="none" stroke="#8B9BB4" stroke-width="2"/>
+  <circle cx="32" cy="32" r="5" fill="none" stroke="#7C6AF7" stroke-width="2"/>
+  <circle cx="48" cy="32" r="5" fill="#2DD4A8"/>
+  <!-- request pulse -->
+  <path d="M21 32 H27" stroke="url(#pulse)" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M37 32 H43" stroke="url(#pulse)" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- packet dot -->
+  <circle cx="32" cy="20" r="3.5" fill="#7C6AF7"/>
+  <path d="M32 24 V27" stroke="#7C6AF7" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+  <!-- method slash -->
+  <path d="M22 44 H42" stroke="#009485" stroke-width="2" stroke-linecap="round" opacity="0.85"/>
+</svg>

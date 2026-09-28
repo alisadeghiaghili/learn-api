@@ -69,24 +69,16 @@ textarea {
 
 .brand {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
   min-width: 0;
 }
 
 .brand-mark {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-  background: var(--packet);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--packet) 25%, transparent);
-  align-self: center;
-}
-
-.brand-name {
-  font-size: var(--fs-lg);
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  display: block;
+  width: 132px;
+  height: 38px;
+  object-fit: contain;
 }
 
 .brand-tag {
