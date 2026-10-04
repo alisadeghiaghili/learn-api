@@ -766,6 +766,70 @@ button.ghost {
   word-break: break-all;
 }
 
+.g-cmd.g-code-snippet {
+  color: #93c5fd;
+  background: color-mix(in srgb, #3b82f6 12%, var(--ink));
+  border-color: color-mix(in srgb, #3b82f6 35%, var(--line));
+}
+
+.g-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+  flex-wrap: wrap;
+}
+
+.target-chip {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-family: var(--ui);
+  line-height: 1.4;
+}
+
+.target-chip.target-editor {
+  color: #93c5fd;
+  background: color-mix(in srgb, #3b82f6 18%, transparent);
+  border: 1px solid color-mix(in srgb, #3b82f6 45%, transparent);
+}
+
+.target-chip.target-run {
+  color: #5eead4;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.target-chip.target-openapi {
+  color: #bef264;
+  background: color-mix(in srgb, #85cb33 18%, transparent);
+  border: 1px solid color-mix(in srgb, #85cb33 45%, transparent);
+}
+
+.target-chip.target-console {
+  color: #fde047;
+  background: color-mix(in srgb, var(--remote) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--remote) 45%, transparent);
+}
+
+.target-hint {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--haze);
+  opacity: 0.85;
+}
+
+.g-prompt {
+  font-size: 12px;
+  color: var(--haze);
+  display: inline-block;
+  margin-inline-end: 6px;
+}
+
 /* Modals & Overlays */
 .overlay {
   position: fixed;

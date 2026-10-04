@@ -9,6 +9,7 @@ import { generateOpenAPI, openApiHas } from './openapi.js';
 /**
  * @typedef {Object} GoalItem
  * @property {'endpoint'|'call'|'code'|'openapi'} kind
+ * @property {'editor'|'run'|'openapi'|'console'} target
  * @property {string} label    LTR code-like label shown in the checklist
  * @property {boolean} done
  * @property {number} [status]
@@ -20,11 +21,11 @@ import { generateOpenAPI, openApiHas } from './openapi.js';
 /**
  * Parser language for a level.
  *
- * @param {{ language: string }} level
+ * @param {{ language?: string }} level
  * @returns {'python'|'r'}
  */
 export function parserLanguage(level) {
-  return level.language === 'r' ? 'r' : 'python';
+  return level?.language === 'r' ? 'r' : 'python';
 }
 
 /**
@@ -65,6 +66,11 @@ export function callGoalMet(parsed, c) {
 
 /**
  * Evaluate a level goal into an ordered checklist.
+ * Chronological order:
+ * 1. Code in editor (codeContains)
+ * 2. Route endpoints compiled on server (endpoints)
+ * 3. OpenAPI contract (openapiHas)
+ * 4. Terminal console requests (calls)
  *
  * @param {import('./engine.js').ParsedApp|null} parsed result of the last Run, or null
  * @param {string} code editor source that produced `parsed`
@@ -79,9 +85,21 @@ export function goalItems(parsed, code, goal) {
   let doc = null;
   const openapi = () => (doc ??= generateOpenAPI(parsed));
 
+  // 1. Code editor text requirements
+  for (const s of g.codeContains || []) {
+    items.push({
+      kind: 'code',
+      target: 'editor',
+      label: s,
+      done: !!parsed && code.includes(s),
+    });
+  }
+
+  // 2. Server route endpoints (compiled via Run in editor)
   for (const e of g.endpoints || []) {
     items.push({
       kind: 'endpoint',
+      target: 'run',
       label: `${e.method} ${e.path}`,
       status: e.status,
       done:
@@ -94,21 +112,28 @@ export function goalItems(parsed, code, goal) {
         ),
     });
   }
+
+  // 3. OpenAPI schema contract
+  for (const s of g.openapiHas || []) {
+    items.push({
+      kind: 'openapi',
+      target: 'openapi',
+      label: s,
+      done: !!parsed && openApiHas(openapi(), s),
+    });
+  }
+
+  // 4. HTTP call tests executed in terminal console
   for (const c of g.calls || []) {
     items.push({
       kind: 'call',
-      label: `${c.method} ${c.path}`,
+      target: 'console',
+      label: callCommand(c),
       expectStatus: c.expectStatus,
       expectBody: c.expectBody,
       command: callCommand(c),
       done: !!parsed && callGoalMet(parsed, c),
     });
-  }
-  for (const s of g.codeContains || []) {
-    items.push({ kind: 'code', label: s, done: !!parsed && code.includes(s) });
-  }
-  for (const s of g.openapiHas || []) {
-    items.push({ kind: 'openapi', label: s, done: !!parsed && openApiHas(openapi(), s) });
   }
   return items;
 }
@@ -131,11 +156,28 @@ export function isSolved(items) {
  * @returns {{ type: 'run', command: string } | { type: 'call', command: string, item: GoalItem } | { type: 'edit', item: GoalItem } | null}
  */
 export function nextAction(items, ctx) {
-  if (!ctx.running || ctx.stale) return { type: 'run', command: 'run' };
   const first = items.find((i) => !i.done);
   if (!first) return null;
+
+  // If editor code requirement is unmet
+  if (first.kind === 'code') {
+    return { type: 'edit', item: first };
+  }
+
+  // If code is modified or server not running
+  if (!ctx.running || ctx.stale) {
+    return { type: 'run', command: 'run' };
+  }
+
+  // If route endpoint or schema is unmet despite running
+  if (first.kind === 'endpoint' || first.kind === 'openapi') {
+    return { type: 'edit', item: first };
+  }
+
+  // If HTTP call test is pending
   if (first.kind === 'call' && first.command) {
     return { type: 'call', command: first.command, item: first };
   }
+
   return { type: 'edit', item: first };
 }

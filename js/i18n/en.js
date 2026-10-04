@@ -68,17 +68,40 @@ export const en = {
     bestSoFar: (cmds, par) => `Best so far: ${cmds} commands · ideal: ${par}`,
     idealSolution: (par) => `Ideal: ${par} commands (lower or equal is great)`,
     solvedBanner: (n) => `Level solved${n !== null ? ` in ${n} commands` : ''}.`,
-    goalDetail: (g) => {
-      if (g.kind === 'endpoint') return `register this route${g.status ? ` · status ${g.status}` : ''}`;
-      if (g.kind === 'call') return `call must return ${g.expectStatus}${g.expectBody ? ' · body matches' : ''}`;
-      if (g.kind === 'code') return 'the code must contain this';
-      return 'the OpenAPI document must contain this';
+    targetBadge: {
+      editor: 'Editor',
+      run: 'Editor → Run',
+      openapi: 'OpenAPI',
+      console: 'Console',
     },
-    runNext: 'Press Run (Ctrl+Enter) to compile the editor code',
+    targetActionHint: {
+      editor: 'server.py',
+      run: 'Ctrl+Enter',
+      openapi: 'contract',
+      console: 'api $',
+    },
+    nextStepTitle: {
+      edit: 'Next step: Write in Code Editor',
+      run: 'Next step: Compile Server (Run)',
+      call: 'Next step: Test in Console',
+    },
+    nextStepPrompt: {
+      edit: 'Add to editor:',
+      run: 'Compile code:',
+      call: 'Type in terminal:',
+    },
+    goalDetail: (g) => {
+      if (g.kind === 'code') return 'Write in editor: code must contain this';
+      if (g.kind === 'endpoint') return `Compile with Run: register this route${g.status ? ` · status ${g.status}` : ''}`;
+      if (g.kind === 'openapi') return 'OpenAPI tab: document must contain this schema/path';
+      if (g.kind === 'call') return `Console: send request · must return ${g.expectStatus}${g.expectBody ? ' · body matches' : ''}`;
+      return '';
+    },
+    runNext: 'Press Run (Ctrl+Enter) in the editor to compile the mock server',
     editNext: (g) => {
-      if (g.kind === 'endpoint') return 'Edit the code so this route exists, then Run';
-      if (g.kind === 'code') return 'Edit the code to include this, then Run';
-      return 'Change the code so the OpenAPI document gains this entry, then Run';
+      if (g.kind === 'code') return `In editor: write "${g.label}", then press Run`;
+      if (g.kind === 'endpoint') return `In editor: define this route, then press Run`;
+      return `In editor: add models/routes for this schema, then press Run`;
     },
     allDoneNext: 'All goals met',
 

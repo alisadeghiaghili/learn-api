@@ -345,7 +345,9 @@ class App {
   suggestion() {
     if (this.mode === 'sandbox') return this.parsed && !this.isStale() ? 'call GET /' : 'run';
     const act = nextAction(this.items(), { running: !!this.parsed, stale: this.isStale() });
-    return act && act.command ? act.command : null;
+    if (act?.type === 'call') return act.command;
+    if (act?.type === 'run') return 'run';
+    return null;
   }
 
   /**
@@ -558,8 +560,16 @@ class App {
     const rows = items
       .map((g, i) => {
         const current = !solved && i === currentIdx;
+        const targetClass = `target-${g.target || g.kind}`;
+        const targetText = u.targetBadge[g.target || g.kind] || g.kind;
+        const hintText = u.targetActionHint[g.target || g.kind] || '';
         return `<li class="${g.done ? 'met' : ''}${current ? ' current' : ''}">
-          <div class="g-label" dir="ltr">${g.done ? '✓' : current ? '▶' : '○'} <code>${escapeHtml(g.label)}</code>${current ? ` <span class="chip current-chip">${escapeHtml(u.nowChip)}</span>` : ''}</div>
+          <div class="g-header">
+            <span class="target-chip ${targetClass}">${escapeHtml(targetText)}</span>
+            ${hintText ? `<span class="target-hint">${escapeHtml(hintText)}</span>` : ''}
+            ${current ? `<span class="chip current-chip">${escapeHtml(u.nowChip)}</span>` : ''}
+          </div>
+          <div class="g-label" dir="ltr">${g.done ? '✓' : current ? '▶' : '○'} <code>${escapeHtml(g.label)}</code></div>
           <div class="g-detail">${escapeHtml(u.goalDetail(g))}</div>
         </li>`;
       })
@@ -569,22 +579,38 @@ class App {
     if (solved) {
       nextBlock = `<div class="next-box met">${escapeHtml(u.allSolutionMet)}</div>`;
     } else {
+      let boxTitle = u.typeNextTitle;
+      let prompt = u.remainingLabel;
       let cmd = '';
       let note = u.wrongCommandNote;
+      let isCode = false;
+
       if (act?.type === 'run') {
+        boxTitle = u.nextStepTitle.run;
+        prompt = u.nextStepPrompt.run;
         cmd = 'run';
         note = u.runNext;
       } else if (act?.type === 'call') {
+        boxTitle = u.nextStepTitle.call;
+        prompt = u.nextStepPrompt.call;
         cmd = act.command;
+        note = u.wrongCommandNote;
       } else if (act?.type === 'edit') {
+        boxTitle = u.nextStepTitle.edit;
+        prompt = u.nextStepPrompt.edit;
         cmd = act.item.label;
         note = u.editNext(act.item);
+        isCode = true;
       }
+
       nextBlock = `<div class="next-box">
-        <div class="next-title">${escapeHtml(u.typeNextTitle)}</div>
-        <div class="next-row"><span class="g-label">○ ${escapeHtml(u.remainingLabel)}</span>${cmd ? `<code class="g-cmd">${escapeHtml(cmd)}</code>` : ''}</div>
+        <div class="next-title">${escapeHtml(boxTitle)}</div>
+        <div class="next-row">
+          <span class="g-prompt">${escapeHtml(prompt)}</span>
+          ${cmd ? `<code class="g-cmd${isCode ? ' g-code-snippet' : ''}">${escapeHtml(cmd)}</code>` : ''}
+        </div>
         <div class="par-note">${escapeHtml(note)}</div>
-        <div class="par-note">${escapeHtml(u.wrongCommandNote)}</div>
+        ${act?.type === 'call' ? `<div class="par-note dim">${escapeHtml(u.wrongCommandNote)}</div>` : ''}
       </div>`;
     }
 
@@ -728,10 +754,17 @@ class App {
         });
       } else if (step.type === 'GoalList') {
         const goals = goalItems(null, '', level.goal)
-          .map(
-            (g) =>
-              `<li><div class="g-label" dir="ltr"><code>${escapeHtml(g.label)}</code></div><div class="g-detail">${escapeHtml(u.goalDetail(g))}</div></li>`
-          )
+          .map((g) => {
+            const targetClass = `target-${g.target || g.kind}`;
+            const targetText = u.targetBadge[g.target || g.kind] || g.kind;
+            return `<li>
+              <div class="g-header">
+                <span class="target-chip ${targetClass}">${escapeHtml(targetText)}</span>
+              </div>
+              <div class="g-label" dir="ltr"><code>${escapeHtml(g.label)}</code></div>
+              <div class="g-detail">${escapeHtml(u.goalDetail(g))}</div>
+            </li>`;
+          })
           .join('');
         showModal({
           title: u.goalsTitle,

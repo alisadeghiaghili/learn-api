@@ -68,17 +68,40 @@ export const fa = {
     bestSoFar: (cmds, par) => `بهترین تا اینجا: ${cmds} فرمان · ایده‌آل: ${par}`,
     idealSolution: (par) => `ایده‌آل: ${par} فرمان (کمتر یا مساوی عالی است)`,
     solvedBanner: (n) => `مرحله حل شد${n !== null ? ` با ${n} فرمان` : ''}.`,
-    goalDetail: (g) => {
-      if (g.kind === 'endpoint') return `این مسیر را ثبت کنید${g.status ? ` · وضعیت ${g.status}` : ''}`;
-      if (g.kind === 'call') return `پاسخ فراخوانی باید ${g.expectStatus} باشد${g.expectBody ? ' · بدنه مطابق' : ''}`;
-      if (g.kind === 'code') return 'کد باید این را شامل شود';
-      return 'سند OpenAPI باید این را شامل شود';
+    targetBadge: {
+      editor: 'ادیتور کد',
+      run: 'ادیتور ← Run',
+      openapi: 'تب OpenAPI',
+      console: 'کنسول',
     },
-    runNext: 'Run (Ctrl+Enter) را بزنید تا کد ادیتور کامپایل شود',
+    targetActionHint: {
+      editor: 'کد سرور',
+      run: 'Ctrl+Enter',
+      openapi: 'مستند قرارداد',
+      console: 'api $',
+    },
+    nextStepTitle: {
+      edit: 'گام بعدی: نوشتن در ادیتور کد',
+      run: 'گام بعدی: کامپایل سرور (Run)',
+      call: 'گام بعدی: تست در کنسول ترمینال',
+    },
+    nextStepPrompt: {
+      edit: 'در ادیتور کد بنویسید:',
+      run: 'کامپایل کد:',
+      call: 'در خط فرمان کنسول وارد کنید:',
+    },
+    goalDetail: (g) => {
+      if (g.kind === 'code') return 'در ادیتور کد بنویسید: سورس باید شامل این عبارت باشد';
+      if (g.kind === 'endpoint') return `با دکمه Run کامپایل کنید تا این مسیر ثبت شود${g.status ? ` · وضعیت ${g.status}` : ''}`;
+      if (g.kind === 'openapi') return 'تب OpenAPI: سند پس از کامپایل باید شامل این ساختار/مسیر باشد';
+      if (g.kind === 'call') return `در کنسول ترمینال اجرا کنید: پاسخ باید کد ${g.expectStatus} باشد${g.expectBody ? ' · بدنه مطابقت دارد' : ''}`;
+      return '';
+    },
+    runNext: 'دکمه Run (یا Ctrl+Enter) در ادیتور را بزنید تا سرور کامپایل شود',
     editNext: (g) => {
-      if (g.kind === 'endpoint') return 'کد را طوری ویرایش کنید که این مسیر وجود داشته باشد، بعد Run';
-      if (g.kind === 'code') return 'کد را طوری ویرایش کنید که این را شامل شود، بعد Run';
-      return 'کد را طوری عوض کنید که سند OpenAPI این مورد را بگیرد، بعد Run';
+      if (g.kind === 'code') return `در ادیتور: عبارت «${g.label}» را بنویسید، سپس Run بزنید`;
+      if (g.kind === 'endpoint') return `در ادیتور: این اندپوینت را تعریف کنید، سپس Run بزنید`;
+      return `در ادیتور: ساختار مناسب برای این مستند را اضافه کنید، سپس Run بزنید`;
     },
     allDoneNext: 'همه‌ی هدف‌ها برآورده شد',
 

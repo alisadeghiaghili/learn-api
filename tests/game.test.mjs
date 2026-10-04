@@ -56,6 +56,26 @@ test('goalItems marks done correctly against parsed app and code', () => {
   assert.equal(isSolved(items), true);
 });
 
+test('goalItems preserves logical sequence: code -> endpoint -> openapi -> call', () => {
+  const goal = {
+    endpoints: [{ method: 'GET', path: '/items' }],
+    calls: [{ method: 'GET', path: '/items', expectStatus: 200 }],
+    codeContains: ['@app.get'],
+    openapiHas: ['paths./items'],
+  };
+  const items = goalItems(null, '', goal);
+  assert.equal(items.length, 4);
+  assert.equal(items[0].kind, 'code');
+  assert.equal(items[0].target, 'editor');
+  assert.equal(items[1].kind, 'endpoint');
+  assert.equal(items[1].target, 'run');
+  assert.equal(items[2].kind, 'openapi');
+  assert.equal(items[2].target, 'openapi');
+  assert.equal(items[3].kind, 'call');
+  assert.equal(items[3].target, 'console');
+  assert.equal(items[3].label, 'call GET /items');
+});
+
 test('nextAction advises correct next step', () => {
   const unmetRun = [{ kind: 'endpoint', label: 'GET /items', done: false }];
   assert.deepEqual(nextAction(unmetRun, { running: false, stale: true }), {
