@@ -57,6 +57,7 @@ export const en = {
     noActiveLevel: 'No active level',
     noActiveLevelDetail: 'levels → pick a challenge to see the checklist here',
     guideFlashNote: 'The toolbar **Guide** button flashes this panel. It stays open at full page height.',
+    patternTitle: 'Code Pattern & Syntax',
     youAreLearning: 'You are learning',
     fieldNotesTitle: 'In production (field notes)',
     typeNextTitle: 'Type next, highlighted in orange',
@@ -99,9 +100,9 @@ export const en = {
     },
     runNext: 'Press Run (Ctrl+Enter) in the editor to compile the mock server',
     editNext: (g) => {
-      if (g.kind === 'code') return `In editor: write "${g.label}", then press Run`;
-      if (g.kind === 'endpoint') return `In editor: define this route, then press Run`;
-      return `In editor: add models/routes for this schema, then press Run`;
+      if (g.kind === 'code') return `In the editor: write or update the required code snippet, then click Run`;
+      if (g.kind === 'endpoint') return `In the editor: implement this route with its handler function, then click Run`;
+      return `In the editor: add models/routes for this schema, then click Run`;
     },
     allDoneNext: 'All goals met',
 

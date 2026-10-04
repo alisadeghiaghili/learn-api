@@ -57,8 +57,9 @@ export const de = {
     noActiveLevel: 'Kein aktives Level',
     noActiveLevelDetail: 'Level → Wähle eine Aufgabe, um die Checkliste hier zu sehen',
     guideFlashNote: 'Der Toolbar-Button **Guide** hebt dieses Panel hervor. Es bleibt über die volle Seitenhöhe geöffnet.',
-    youAreLearning: 'Lernziele',
-    fieldNotesTitle: 'In Produktion (Praxishinweise)',
+    patternTitle: 'Code-Muster & Syntax',
+    youAreLearning: 'Lernziele (Grundlagen & Interna)',
+    fieldNotesTitle: 'In Produktion (Praxishinweise & Best Practices)',
     typeNextTitle: 'Nächster Schritt (orange hervorgehoben)',
     remainingLabel: 'verbleibend',
     wrongCommandNote: 'Anderes Ergebnis? Du bleibst hier und der Fortschritt bleibt erhalten. Verlauf: ↑ / ↓',
@@ -91,7 +92,7 @@ export const de = {
       call: 'Im Terminal eingeben:',
     },
     goalDetail: (g) => {
-      if (g.kind === 'code') return 'Im Editor schreiben: Code muss diesen Baustein enthalten';
+      if (g.kind === 'code') return 'Im Editor schreiben: Code muss diese Struktur enthalten';
       if (g.kind === 'endpoint') return `Mit Run kompilieren: Route registrieren${g.status ? ` · Status ${g.status}` : ''}`;
       if (g.kind === 'openapi') return 'OpenAPI-Tab: Dokument muss dieses Schema oder diesen Pfad enthalten';
       if (g.kind === 'call') return `Konsole: Request senden · muss Status ${g.expectStatus} liefern${g.expectBody ? ' · Payload muss passen' : ''}`;
@@ -99,8 +100,8 @@ export const de = {
     },
     runNext: 'Drücke Run (Strg+Enter) im Editor, um den Mock-Server zu kompilieren',
     editNext: (g) => {
-      if (g.kind === 'code') return `Im Editor: "${g.label}" schreiben, danach Run drücken`;
-      if (g.kind === 'endpoint') return 'Im Editor: Diese Route definieren, danach Run drücken';
+      if (g.kind === 'code') return 'Im Editor: Den erforderlichen Code-Abschnitt schreiben und auf Run klicken';
+      if (g.kind === 'endpoint') return 'Im Editor: Diese Route mit Handler-Funktion definieren und auf Run klicken';
       return 'Im Editor: Modelle/Routen für dieses Schema definieren, danach Run drücken';
     },
     allDoneNext: 'Alle Ziele erfüllt',

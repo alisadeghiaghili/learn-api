@@ -1,155 +1,549 @@
 /**
- * German intro-dialog copy per level. Code, commands and HTTP terms stay
- * in English inside the text. Each entry becomes: ModalAlert (intro),
- * optional ApiDemo (demo), then the goal list.
+ * German intro-dialog lessons per level.
+ * Code, commands and technical terms are kept in standard English.
+ * Multi-slide lessons covering architecture, internals, and code patterns.
  */
 
 export const DE_DIALOGS = {
   'http-01': {
     intro: [
-      '## Endpoints',
-      'Eine API stellt **Endpoints** bereit: adressierbare Operationen auf einem Server. Jeder Endpoint verbindet eine HTTP-Methode mit einem Pfad.',
+      '## Was ist ein Endpoint in HTTP?',
+      'Ein **Endpoint** ist ein adressierbarer Vorgang auf einem Server. Nach RFC 9110 verbindet er eine HTTP-Methode mit einem URI-Pfad.',
       'In FastAPI wird dies mit einem Dekorator registriert: `@app.get("/")` verarbeitet `GET /`.',
-      'Die Funktion unter dem Dekorator wird bei Eintreffen eines Requests ausgeführt und liefert JSON zurück.',
+      'Die Funktion unter dem Dekorator läuft bei Anfragen und liefert ein JSON-Dictionary zurück.',
+    ],
+    slides: [
+      [
+        '## Was ist ein Endpoint in HTTP?',
+        'Ein **Endpoint** ist das Eingangstor für Client-Anfragen. Jeder HTTP-Aufruf startet mit einer Request-Line: `METHOD /path HTTP/1.1`.',
+        'Clients kennen keine internen Python-Details; sie kommunizieren ausschließlich über den definierten Schnittstellenvertrag.',
+      ],
+      [
+        '## Interna: Wie der Server den Request verarbeitet',
+        '1. Der **ASGI-Server** (Uvicorn) empfängt TCP-Pakete und baut den Connection-Scope auf.\n' +
+        '2. Der **Starlette-Router** gleicht den Pfad mit der Routing-Tabelle ab und wählt die registrierte Handler-Funktion.\n' +
+        '3. Der Rückgabewert wird von `jsonable_encoder` in UTF-8 JSON mit `Content-Type: application/json` serialisiert.',
+      ],
+      [
+        '## Standard-Codemuster',
+        'Definiere den Dekorator und die Handler-Funktion im Editor:\n\n' +
+        '```python\n' +
+        '@app.get("/")\n' +
+        'def read_root():\n' +
+        '    return {"hello": "world"}\n' +
+        '```\n\n' +
+        'Klicke auf **Run** und teste danach in der Konsole mit `call GET /`.',
+      ],
     ],
     demo: {
-      before: 'Registriere `GET /` und beobachte, wie der Knoten auf der API-Oberfläche erscheint.',
-      after: '`GET /` ist live. Rufe den Endpoint aus der Konsole auf: `call GET /` ',
+      before: 'Registriere `GET /` und beobachte die API-Oberfläche.',
+      after: '`GET /` ist live. Rufe es in der Konsole auf: `call GET /`',
       command: 'call GET /',
     },
   },
+
   'http-02': {
     intro: [
-      '## HTTP-Methoden',
-      '`GET` liest Daten. `POST` erstellt Ressourcen. `PUT`/`PATCH` modifizieren sie. `DELETE` löscht.',
-      'Ein Pfad mit verschiedenen Methoden repräsentiert unterschiedliche Endpoints. Verwende `@app.post(..., status_code=201)` für den Erstellungsstatus.',
+      '## HTTP-Methoden: Sicheres Lesen vs. Datenmutation',
+      '`GET` liest. Nach RFC 9110 muss es sicher (Safe) und idempotent sein und darf den Serverzustand nicht verändern.',
+      '`POST` erstellt Ressourcen und antwortet typischerweise mit dem Statuscode **201 Created**.',
+      'Gleicher Pfad mit unterschiedlichen Methoden = zwei völlig eigenständige Endpoints.',
+    ],
+    slides: [
+      [
+        '## HTTP-Methoden: Sicheres Lesen vs. Datenmutation',
+        'HTTP-Verben steuern die Semantik von Operationen:\n' +
+        '• **GET**: Sicheres Abrufen ohne Seiteneffekte (Cache-fähig).\n' +
+        '• **POST**: Erstellen neuer Entitäten (weder Safe noch Idempotent).\n' +
+        '• **PUT/PATCH**: Aktualisierung von Daten.\n' +
+        '• **DELETE**: Löschen von Ressourcen.',
+      ],
+      [
+        '## Interna: Warum Status 201 Created?',
+        'Status 200 OK sagt nichts darüber aus, ob eine neue Ressource persistiert wurde.\n\n' +
+        'Status **201 Created** bestätigt explizit die Zuweisung einer neuen Entität. In FastAPI konfigurierst du dies über `status_code=201`.',
+      ],
+      [
+        '## Standard-Codemuster',
+        'Definiere die POST-Route mit Status 201:\n\n' +
+        '```python\n' +
+        '@app.post("/items", status_code=201)\n' +
+        'def create_item():\n' +
+        '    return {"id": 1, "name": "widget"}\n' +
+        '```',
+      ],
     ],
   },
+
   'fastapi-01': {
     intro: [
-      '## Pfad-Parameter',
-      'Teile des Pfads in geschweiften Klammern sind **Pfad-Parameter**: `/users/{user_id}` matched `/users/42` mit `user_id=42`.',
-      'Deklariere den Typ in der Funktionssignatur. FastAPI validiert automatisch: Für `int` wird der Wert `ada` mit **422 Unprocessable Entity** abgewiesen.',
-      'Nach dem Kompilieren testen: `call GET /users/ada`.',
+      '## Dynamische Pfad-Parameter',
+      'Ein Pfadsegment in geschweiften Klammern ist ein **Pfad-Parameter**: `/users/{user_id}` matched z. B. `/users/42`.',
+      'Mit Typannotation (`user_id: int`) validiert FastAPI automatisch. Ungültige Typen wie `ada` werden mit **422** abgewiesen.',
+    ],
+    slides: [
+      [
+        '## Dynamische Pfad-Parameter',
+        'In RESTful APIs werden einzelne Ressourcen über hierarchische Pfadbezeichner adressiert: `/users/{user_id}`.\n\n' +
+        'Pfad-Parameter bestimmen die Identität der Ressource und sind immer zwingend erforderlich.',
+      ],
+      [
+        '## Interna: Type-Casting und 422-Validierung',
+        'FastAPI inspiziert die Funktionssignatur beim Start mit `inspect.signature`.\n\n' +
+        'Bei einer Anfrage wandelt das Framework den String in einen Integer um. Schlägt die Konvertierung fehl, wird die Funktion gar nicht erst aufgerufen, sondern sofort ein RFC 7807 422 Fehler zurückgegeben.',
+      ],
+      [
+        '## Standard-Codemuster',
+        'Füge den Pfadparameter mit Typdeklaration ein:\n\n' +
+        '```python\n' +
+        '@app.get("/users/{user_id}")\n' +
+        'def get_user(user_id: int):\n' +
+        '    return {"id": user_id, "name": "ada"}\n' +
+        '```\n\n' +
+        'Teste in der Konsole: `call GET /users/42`',
+      ],
     ],
   },
+
   'fastapi-02': {
     intro: [
-      '## Query-Parameter',
-      'Alles nach dem Fragezeichen `?` gehört zum Query-String: `GET /search?q=ada&limit=2`.',
-      'In FastAPI werden Funktionsargumente, die nicht im Pfad vorkommen, automatisch als Query-Parameter interpretiert. Standardwerte machen sie optional.',
-      'Drücke `run` und teste `call GET /search?q=ada&limit=2`, um das Parsing zu beobachten.',
+      '## Filter und Paginierung mit Query-Parametern',
+      'Alles nach `?` ist der Query-String: `GET /search?q=ada&limit=2`.',
+      'Nicht im Pfad enthaltene Funktionsargumente werden in FastAPI automatisch zu Query-Parametern. Ein Default macht sie optional.',
+    ],
+    slides: [
+      [
+        '## Filter und Paginierung mit Query-Parametern',
+        'Während Pfad-Parameter Ressourcen *identifizieren*, steuern Query-Parameter deren *Präsentation*: Paginierung, Sortierung und Suche.\n\n' +
+        'RFC 3986 definiert den Standard mit `?` und `&`.',
+      ],
+      [
+        '## Interna: Optionale vs. erforderliche Parameter',
+        'Hat ein Parameter einen Standardwert (`limit: int = 10`), ist er optional.\n\n' +
+        'Fehlt der Default (`q: str`), ist der Query-Parameter verpflichtend. Fehlt er im Request, antwortet FastAPI automatisch mit 422.',
+      ],
+      [
+        '## Standard-Codemuster',
+        'Definiere die Query-Parameter mit Defaultwerten:\n\n' +
+        '```python\n' +
+        '@app.get("/search")\n' +
+        'def search(q: str = "", limit: int = 10):\n' +
+        '    return {"q": q, "limit": limit}\n' +
+        '```\n\n' +
+        'Teste: `call GET /search?q=ada&limit=2`',
+      ],
     ],
   },
+
   'fastapi-03': {
     intro: [
-      '## Request-Body',
-      'Schreibende Operationen erwarten oft einen **JSON-Body**. FastAPI validiert diesen mithilfe eines Pydantic-`BaseModel`.',
-      'Das OpenAPI-Dokument deklariert anschließend `components.schemas.User` — genau das, was Swagger UI anzeigt.',
-      'Senden: `call POST /users body={"name":"ada","age":36}`.',
+      '## Request-Body mit Pydantic BaseModel',
+      'POST-Requests übertragen strukturierte Daten im **JSON-Body**. FastAPI validiert diese über Pydantic `BaseModel` Klassen.',
+      'Das Schema wird automatisch in OpenAPI unter `components.schemas.User` publiziert und treibt Swagger UI an.',
+    ],
+    slides: [
+      [
+        '## Request-Body mit Pydantic BaseModel',
+        'Eingehende Nutzdaten müssen auf Vollständigkeit und Typkorrektheit geprüft werden, bevor sie verarbeitet werden dürfen.',
+      ],
+      [
+        '## Interna: Deserialisierung und Validierungs-Pipeline',
+        '1. Der Server liest den Request-Stream und parst JSON.\n' +
+        '2. Pydantic validiert jedes Feld gegen deklarierte Typen.\n' +
+        '3. Bei Erfolg erhält deine Funktion ein typisiertes Objekt; bei Fehlern erzeugt FastAPI eine detaillierte 422-Meldung mit Fehlerposition.',
+      ],
+      [
+        '## Standard-Codemuster',
+        'Definiere das Modell und die Route:\n\n' +
+        '```python\n' +
+        'class User(BaseModel):\n' +
+        '    name: str\n' +
+        '    age: int = 0\n\n' +
+        '@app.post("/users", status_code=201)\n' +
+        'def create_user(user: User):\n' +
+        '    return {"id": 1, "name": user.name, "age": user.age}\n' +
+        '```',
+      ],
     ],
   },
+
   'fastapi-04': {
     intro: [
-      '## Statuscodes',
-      '200 OK · 201 Created · 204 No Content · 404 Not Found · 422 Validation Error',
-      'Nutze präzise Statuscodes, um dem Client das Ergebnis mitzuteilen. Ein erfolgreiches `DELETE` liefert typischerweise **204** ohne Body zurück.',
+      '## Statuscodes und Löschen mit 204 No Content',
+      'Semantische Statuscodes informieren Clients präzise: 200 OK · 201 Created · 204 No Content · 404 Not Found · 422 Validation Error.',
+      'Ein erfolgreiches `DELETE` ohne Rückgabedaten antwortet nach HTTP-Standard mit **204** und leerem Body.',
+    ],
+    slides: [
+      [
+        '## Statuscodes und Löschen mit 204 No Content',
+        'Klare Statuscodes bilden das Rückgrat stabiler API-Schnittstellen. Das Zurückgeben falscher Codes bricht Client-Bibliotheken.',
+      ],
+      [
+        '## Interna: RFC 9110 No-Content Semantik',
+        'Gemäß RFC 9110 §15.3.5 darf eine 204-Antwort keinen Body enthalten. HTTP-Clients und Browser verwerfen eventuelle Bytes.\n\n' +
+        'In FastAPI wird dies über `status_code=204` deklariert.',
+      ],
+      [
+        '## Standard-Codemuster',
+        'Implementiere die DELETE-Route mit Status 204:\n\n' +
+        '```python\n' +
+        '@app.delete("/notes/{note_id}", status_code=204)\n' +
+        'def delete_note(note_id: int):\n' +
+        '    return {}\n' +
+        '```',
+      ],
     ],
   },
+
   'fastapi-05': {
     intro: [
-      '## CRUD-Ressourcen',
-      'Eine Ressource ist mehr als ein einzelner Pfad. **C**reate via `POST`, **R**ead via `GET`, **U**pdate via `PUT`, **D**elete via `DELETE`.',
-      'Derselbe Pfad `/notes/{note_id}` dient zum Lesen, Bearbeiten und Löschen; der Collection-Pfad `/notes` zum Auflisten und Erstellen.',
-      'So werden produktive REST-APIs strukturiert.',
+      '## Vollständiges CRUD-Muster auf REST-Ressourcen',
+      'Ressourcen-Architektur: **C**reate `POST` · **R**ead `GET` · **U**pdate `PUT` · **D**elete `DELETE`.',
+      'Kollektionen liegen unter `/notes`; einzelne Ressourcen unter `/notes/{note_id}`.',
+    ],
+    slides: [
+      [
+        '## Vollständiges CRUD-Muster auf REST-Ressourcen',
+        'REST strukturiert APIs um Substantive (`/notes`). Das HTTP-Verb bestimmt die auszuführende Aktion.',
+      ],
+      [
+        '## Interna: PUT vs. PATCH',
+        '• **PUT** ersetzt die komplette Ressourcendarstellung und muss idempotent sein.\n' +
+        '• **PATCH** modifiziert selektiv einzelne Felder der Ressource.',
+      ],
+      [
+        '## Standard-Codemuster',
+        'Implementiere die 4 Operationen:\n\n' +
+        '```python\n' +
+        '@app.post("/notes", status_code=201)\n' +
+        'def create_note(): return {"id": 1, "title": "hello"}\n\n' +
+        '@app.put("/notes/{note_id}")\n' +
+        'def update_note(note_id: int): return {"id": note_id, "title": "updated"}\n\n' +
+        '@app.delete("/notes/{note_id}", status_code=204)\n' +
+        'def delete_note(note_id: int): return {}\n' +
+        '```',
+      ],
     ],
   },
+
   'fastapi-06': {
     intro: [
-      '## Fehler als Teil des API-Contracts',
-      'Eine nicht gefundene Ressource ist ein **404** — kein interner Stack-Trace und kein stummes `200` mit `null`.',
-      'In FastAPI wird dies mit `raise HTTPException(status_code=404, detail="...")` ausgelöst.',
-      'OpenAPI listet 404 unter `responses` auf; Clients und Swagger UI können sich darauf verlassen.',
-      'Nach Run ausführen: `call GET /items/99`.',
+      '## Fehlerbehandlung mit HTTPException',
+      'Eine fehlende Ressource erfordert **404**, keinen 500-Crash und kein stummes `200` mit `null`.',
+      'FastAPI signalisiert Fehler mit `raise HTTPException(status_code=404, detail="...")`.',
+    ],
+    slides: [
+      [
+        '## Fehlerbehandlung mit HTTPException',
+        'Sauberes Exception-Handling verhindert Informationslecks und liefert standardisierte Fehlerformate an Clients.',
+      ],
+      [
+        '## Interna: Starlette Exception-Middleware',
+        'Das Werfen von `HTTPException` stoppt den Handler. Starlettes Exception-Handler fängt den Fehler ab und erzeugt den JSON-Envelope `{"detail": "..."}` mit dem entsprechenden HTTP-Status.',
+      ],
+      [
+        '## Standard-Codemuster',
+        'Prüfe die Bedingung und wirf die Exception:\n\n' +
+        '```python\n' +
+        'if item_id == 99:\n' +
+        '    raise HTTPException(status_code=404, detail="Item not found")\n' +
+        '```\n\n' +
+        'Teste in der Konsole: `call GET /items/99`',
+      ],
     ],
   },
+
   'fastapi-07': {
     intro: [
-      '## Dependency Injection (Depends)',
-      'Ein Handler sollte DB-Sessions oder Konfigurationen nicht manuell instanziieren. **Dependencies** sind modulare Provider, die FastAPI automatisch injiziert.',
-      '```\ndef get_settings():\n    return {"app_name": "LearnAPI"}\n\n@app.get("/info")\ndef info(settings: dict = Depends(get_settings)):\n    return {"app": settings["app_name"]}\n```',
-      'Das ist das Rückgrat moderner FastAPI-Architekturen für Authentifizierung, Datenbanken und Configs.',
+      '## Dependency Injection mit Depends',
+      'Handler sollten Konfigurationen oder Datenbank-Sessions nicht selbst erzeugen. **Dependencies** sind wiederverwendbare Provider, die FastAPI injiziert.',
+      'Das Rückgrat jeder produktiven FastAPI-App: Auth, Datenbanken und Settings nutzen `Depends`.',
+    ],
+    slides: [
+      [
+        '## Dependency Injection mit Depends',
+        'Dependency Injection implementiert das Prinzip der **Inversion of Control (IoC)**. Komponenten werden lose gekoppelt und zentral verwaltet.',
+      ],
+      [
+        '## Interna: Auflösung des Dependency-Graphen',
+        'FastAPI modelliert Abhängigkeiten als gerichteten azyklischen Graphen (DAG). Werden Sub-Dependencies mehrfach benötigt, cacht das Framework Ergebnisse pro Request.\n\n' +
+        'Generator-Funktionen mit `yield` erlauben sauberes Öffnen und Schließen von Datenbank-Transaktionen.',
+      ],
+      [
+        '## Standard-Codemuster',
+        'Definiere den Provider und injiziere ihn:\n\n' +
+        '```python\n' +
+        'def get_settings():\n' +
+        '    return {"app_name": "LearnAPI", "debug": False}\n\n' +
+        '@app.get("/info")\n' +
+        'def info(settings: dict = Depends(get_settings)):\n' +
+        '    return {"app": settings["app_name"], "debug": settings["debug"]}\n' +
+        '```',
+      ],
     ],
   },
+
   'fastapi-08': {
     intro: [
-      '## Authentifizierung als Contract',
-      'API-Keys werden häufig als **HTTP-Header** übergeben. FastAPI deklariert sie via `Header(...)`, und OpenAPI publiziert `securitySchemes`.',
-      'Swagger UI zeigt dafür ein Schloss-Symbol an: Kein Zierelement, sondern ein valider Contract zur Codegenerierung.',
-      'Ohne Header antwortet der Server mit **401**. Mit `headers={"X-API-Key":"secret"}` ist der Zugriff autorisiert.',
+      '## Header-Validierung und API-Key Authentifizierung',
+      'Mit `Header(...)` werden HTTP-Header abgefragt. Fehlt ein Pflicht-Header, wird die Anfrage mit **401** oder **422** abgewiesen.',
+      'Sicherheitsanforderungen werden automatisch in OpenAPI `components.securitySchemes` dokumentiert.',
+    ],
+    slides: [
+      [
+        '## Header-Validierung und API-Key Authentifizierung',
+        'HTTP-Header transportieren Authentifizierungsinformationen wie Tokens und API-Schlüssel außerhalb der sichtbaren URL.',
+      ],
+      [
+        '## Interna: Case-Insensitive Header und Timing-Schutz',
+        'Nach RFC 7230 sind Header-Namen unabhängig von Groß-/Kleinschreibung. FastAPI konvertiert `api_key` zu `api-key`.\n\n' +
+        'In Produktion sollten geheime Tokens immer mit `secrets.compare_digest` verglichen werden, um Timing-Angriffe auszuschließen.',
+      ],
+      [
+        '## Standard-Codemuster',
+        'Deklariere den Header-Parameter:\n\n' +
+        '```python\n' +
+        '@app.get("/admin")\n' +
+        'def admin(api_key: str = Header(...)):\n' +
+        '    return {"ok": True, "who": "admin"}\n' +
+        '```\n\n' +
+        'Teste: `call GET /admin headers={"api-key":"secret"}`',
+      ],
     ],
   },
+
   'fastapi-09': {
     intro: [
-      '## response_model',
-      'Was eine Funktion intern erzeugt, unterscheidet sich oft von dem, was sie **garantiert**. `response_model=UserOut` sichert die öffentliche Struktur ab.',
-      'In FastAPI filtert dies auch vertrauliche interne Felder heraus. Clients verlassen sich auf dieses Schema.',
-      'Prüfe nach dem Ausführen `components.schemas.UserOut` in OpenAPI.',
+      '## Datenfilterung mit response_model',
+      'Das `response_model` definiert den Ausgabevertrag und filtert vertrauliche Daten (wie Passwort-Hashes) vor der Auslieferung heraus.',
+      'Es dokumentiert außerdem die 200 OK Response-Struktur in der OpenAPI-Spezifikation.',
+    ],
+    slides: [
+      [
+        '## Datenfilterung mit response_model',
+        'Ein häufiges Sicherheitsrisiko ist das versehentliche Durchreichen interner Datenbankfelder an den Client. Das `response_model` fungiert als Output-Filter.',
+      ],
+      [
+        '## Interna: Filterung und Schema-Generierung',
+        'Selbst wenn dein Handler ein Dictionary mit internen Feldern liefert, serialisiert FastAPI nur die im `response_model` deklarierten Eigenschaften.\n\n' +
+        'Gleichzeitig wird der OpenAPI-Response-Zweig für Status 200 automatisch erzeugt.',
+      ],
+      [
+        '## Standard-Codemuster',
+        'Definiere das Output-Modell und binde es an die Route:\n\n' +
+        '```python\n' +
+        'class UserOut(BaseModel):\n' +
+        '    id: int\n' +
+        '    name: str\n\n' +
+        '@app.get("/users/{user_id}", response_model=UserOut)\n' +
+        'def get_user(user_id: int):\n' +
+        '    return {"id": user_id, "name": "ada", "hashed_password": "secret"}\n' +
+        '```',
+      ],
     ],
   },
+
   'plumber-01': {
     intro: [
-      '## Plumber-Dekoratoren (R)',
-      'Plumber verwandelt R-Funktionen mittels **roxygen2-Kommentaren** in HTTP-Endpoints.',
-      '```\n#* @get /\nfunction() list(hello = "world")\n```',
-      'Der Kommentar `#* @get /` bindet die nachfolgende Funktion an `GET /`. Eine zurückgegebene `list()` wird automatisch zu JSON serialisiert.',
+      '## Webdienste in R mit Plumber',
+      'Das Plumber-Paket wandelt native R-Funktionen über spezielle Kommentare `#* @get /` in HTTP-Endpoints um.',
+      'Listen-Rückgaben in R werden über das `jsonlite` Paket automatisch in JSON konvertiert.',
+    ],
+    slides: [
+      [
+        '## Webdienste in R mit Plumber',
+        'In Data-Science- und Statistik-Projekten ermöglicht Plumber die direkte Bereitstellung von R-Modellen als Web-API.',
+      ],
+      [
+        '## Interna: Kommentar-Parser und Router',
+        'Plumber analysiert die roxygen2-Kommentare und erstellt ein `PlumberRouter`-Objekt, das Funktionsabschlüsse (Closures) an HTTP-Routen bindet.',
+      ],
+      [
+        '## Standard-Codemuster',
+        'Schreibe den Kommentar und die Handler-Funktion:\n\n' +
+        '```r\n' +
+        '#* @get /\n' +
+        'function() list(hello = "world")\n' +
+        '```',
+      ],
     ],
   },
+
   'plumber-02': {
     intro: [
       '## Pfad-Parameter in Plumber',
-      'Spitze Klammern definieren Pfad-Parameter: `#* @get /users/<id>` matched `/users/7`.',
-      'Deklariere sie mit `#* @param id:int` und nimm `id` in die Funktionsargumente auf.',
-      'Dies ist das R-Äquivalent zu FastAPI `/users/{user_id}`.',
+      'Spitze Klammern markieren Pfad-Parameter: `#* @get /users/<id>` matched z. B. `/users/7`.',
+      'Der Kommentar `#* @param id:int` deklariert den Typ, der als Funktionsargument übergeben wird.',
+    ],
+    slides: [
+      [
+        '## Pfad-Parameter in Plumber',
+        'Wie in Python-Frameworks können auch in R Pfadvariablen zur Adressierung von Einzelressourcen genutzt werden.',
+      ],
+      [
+        '## Interna: Typkonvertierung in R',
+        'URI-Segmente kommen als Zeichenketten an. Die Umwandlung mit `as.integer(id)` stellt sicher, dass in JSON Zahlenwerte statt Strings erzeugt werden.',
+      ],
+      [
+        '## Standard-Codemuster',
+        'Definiere den parametrisierten Endpunkt:\n\n' +
+        '```r\n' +
+        '#* @get /users/<id>\n' +
+        '#* @param id:int\n' +
+        'function(id) list(id = as.integer(id), name = "ada")\n' +
+        '```',
+      ],
     ],
   },
+
   'plumber-03': {
     intro: [
-      '## Request-Body in Plumber',
-      'Für `POST` nimmt die Funktion das `req`-Objekt entgegen und liest `req$postBody` (JSON-String). Geparsed wird mit `jsonlite::fromJSON`.',
-      'Den Statuscode steuerst du mit `#* @status 201`; das Äquivalent zu FastAPIs `status_code=201`.',
-      'Testen: `call POST /users body={"name":"ada"}`.',
+      '## POST-Body und Response-Steuerung in Plumber',
+      'Über die speziellen Parameter `req` und `res` steuert Plumber den Request- und Response-Lebenszyklus.',
+      'Die Payload liegt in `req$postBody`; der Statuscode wird über `res$status <- 201` gesetzt.',
+    ],
+    slides: [
+      [
+        '## POST-Body und Response-Steuerung in Plumber',
+        'Beim Erstellen von Ressourcen sendet der Client JSON im Request-Body. Plumber stellt diesen bereit und erlaubt volle Kontrolle über Header und Status.',
+      ],
+      [
+        '## Interna: Das Response-Objekt und Serializer',
+        'Mit `res$status <- 201` wird der HTTP-Status gesetzt. Die Annotation `#* @serializer json` stellt die korrekte JSON-Auslieferung sicher.',
+      ],
+      [
+        '## Standard-Codemuster',
+        'Implementiere die POST-Route mit Status 201:\n\n' +
+        '```r\n' +
+        '#* @post /users\n' +
+        '#* @serializer json\n' +
+        'function(req, res) {\n' +
+        '  res$status <- 201\n' +
+        '  list(id = 1, name = req$postBody$name)\n' +
+        '}\n' +
+        '```',
+      ],
     ],
   },
+
   'openapi-01': {
     intro: [
-      '## OpenAPI / Swagger',
-      'Jede FastAPI-Anwendung generiert automatisch ein **OpenAPI**-Dokument: `info`, `paths` und `components`.',
-      'Swagger UI ist lediglich ein *Renderer* dieser Spezifikation. Tags gruppieren Operationen und summaries beschreiben sie.',
-      'Drücke **Run**, öffne den OpenAPI-Tab und nutze `openapi` in der Konsole.',
+      '## Metadaten in OpenAPI 3.0',
+      'OpenAPI ist die maschinenlesbare Spezifikation deiner API. Mit `tags` und `summary` gruppierst und dokumentierst du deine Endpoints.',
+      'Swagger UI und Redoc rendern diese Daten als interaktives Entwicklerportal.',
+    ],
+    slides: [
+      [
+        '## Metadaten in OpenAPI 3.0',
+        'Klare Dokumentation ist essenziell für die Zusammenarbeit. OpenAPI 3.0 bietet ein plattformunabhängiges Format zur exakten Schnittstellenbeschreibung.',
+      ],
+      [
+        '## Interna: Schemakompilierung in FastAPI',
+        'Dekorator-Parameter wie `tags=["pets"]` und `summary="..."` fließen direkt in das generierte OpenAPI-JSON ein.',
+      ],
+      [
+        '## Standard-Codemuster',
+        'Ergänze die Metadaten in den Routen:\n\n' +
+        '```python\n' +
+        '@app.get("/pets", tags=["pets"], summary="List pets")\n' +
+        'def list_pets():\n' +
+        '    return [{"name": "fido"}]\n\n' +
+        '@app.post("/pets", status_code=201, tags=["pets"], summary="Create pet")\n' +
+        'def create_pet():\n' +
+        '    return {"name": "fido"}\n' +
+        '```',
+      ],
     ],
   },
+
   'openapi-02': {
     intro: [
-      '## components.schemas',
-      'Benannte Modelle bilden den Contract, aus dem Client-SDKs generiert werden.',
-      'Ein `BaseModel`, das als Body dient, wird zu `#/components/schemas/Item` und im `requestBody` referenziert.',
-      'Nach `run` findest du genau dieses Schema im OpenAPI-Panel wieder.',
+      '## Request-Schemas unter components.schemas',
+      'Pydantic-Modelle werden automatisch in JSON-Schemas unter `components.schemas` übersetzt.',
+      'Routen referenzieren das Schema über `$ref`, sodass Frontend-Clients Typdefinitionen direkt ableiten können.',
+    ],
+    slides: [
+      [
+        '## Request-Schemas unter components.schemas',
+        'Im Contract-First Design werden Datenstrukturen zentral definiert, um Redundanzen und Versionskonflikte zu vermeiden.',
+      ],
+      [
+        '## Interna: Referenzierung mit $ref',
+        'Anstatt Schemas an jedem Endpoint zu duplizieren, verweist die OpenAPI-Spezifikation per `$ref: "#/components/schemas/Item"` auf die zentrale Definition.',
+      ],
+      [
+        '## Standard-Codemuster',
+        'Definiere das Modell und die Route:\n\n' +
+        '```python\n' +
+        'class Item(BaseModel):\n' +
+        '    name: str\n\n' +
+        '@app.post("/items", status_code=201)\n' +
+        'def create_item(item: Item):\n' +
+        '    return {"name": item.name}\n' +
+        '```',
+      ],
     ],
   },
+
   'compare-01': {
     intro: [
-      '## Ein Contract, zwei Runtimes',
-      'Der OpenAPI-Contract ist technologieunabhängig. FastAPI und Plumber publizieren identische Pfade, Methoden und Schemas.',
-      'Hier implementierst du die FastAPI-Seite. Vergleiche im nächsten Level die Plumber-Annotationen mit den Python-Dekoratoren.',
-      '```\n#* @get /health\nfunction() list(status = "ok")\n```',
+      '## Betriebs-Endpoints in FastAPI',
+      'Cloud-Infrastrukturen und Kubernetes benötigen dedizierte Endpoints wie `/health` und `/metrics` zur Container-Steuerung.',
+      'Die Trennung von Business- und Ops-Routen entkoppelt Überwachungstraffic von Anwendungsdaten.',
+    ],
+    slides: [
+      [
+        '## Betriebs-Endpoints in FastAPI',
+        'Observability erfordert standardisierte Prüf-Endpoints für Liveness (Läuft der Container?) und Readiness (Bereit für Anfragen?).',
+      ],
+      [
+        '## Interna: Kubernetes Container-Probes',
+        'Kubernetes pollt diese Pfade regelmäßig. Schlägt ein Check fehl, wird der Container automatisch isoliert oder neu gestartet.',
+      ],
+      [
+        '## Standard-Codemuster',
+        'Implementiere die Ops-Endpoints:\n\n' +
+        '```python\n' +
+        '@app.get("/health")\n' +
+        'def health():\n' +
+        '    return {"status": "ok"}\n\n' +
+        '@app.get("/metrics")\n' +
+        'def metrics():\n' +
+        '    return {"status": "ok"}\n' +
+        '```',
+      ],
     ],
   },
+
   'compare-02': {
     intro: [
-      '## Das Plumber-Gegenstück',
-      'Dieselben zwei Endpoints, geschrieben in R. Roxygen2-Kommentare ersetzen Python-Dekoratoren, und `list()` ersetzt Dictionaries.',
-      'Die resultierende OpenAPI-Spezifikation ist nahezu identisch — Clients bemerken keinen Unterschied in der Backend-Technologie.',
+      '## Betriebs-Endpoints in R: Sprachunabhängigkeit',
+      'Die Implementierung derselben `/health` und `/metrics` Endpoints in R beweist die Sprachunabhängigkeit von HTTP-APIs.',
+      'Clients und Monitoring-Tools erhalten unabhängig von der internen Sprache exakt dasselbe Protokollverhalten.',
+    ],
+    slides: [
+      [
+        '## Betriebs-Endpoints in R: Sprachunabhängigkeit',
+        'APIs definieren Verträge. Ob dahinter Python mit FastAPI oder R mit Plumber läuft, ist für den Aufrufer irrelevant.',
+      ],
+      [
+        '## Interna: Einheitliches Monitoring in Polyglot-Umgebungen',
+        'Monitoring-Systeme wie Prometheus erfassen standardisierte `/metrics`-Endpoints sprachübergreifend in einem zentralen Dashboard.',
+      ],
+      [
+        '## Standard-Codemuster',
+        'Implementiere die Endpoints in R:\n\n' +
+        '```r\n' +
+        '#* @get /health\n' +
+        'function() {\n' +
+        '  list(status = "ok")\n' +
+        '}\n\n' +
+        '#* @get /metrics\n' +
+        'function() {\n' +
+        '  list(status = "ok")\n' +
+        '}\n' +
+        '```',
+      ],
     ],
   },
 };

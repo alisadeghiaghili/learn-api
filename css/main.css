@@ -572,6 +572,30 @@ button.ghost {
   margin-bottom: 12px;
 }
 
+.pattern-box {
+  border: 1px solid color-mix(in srgb, #86CDC6 35%, var(--line));
+  background: color-mix(in srgb, #86CDC6 7%, var(--ink));
+  border-radius: 10px;
+  padding: 10px;
+  margin: 0 0 10px;
+}
+
+.pattern-box pre {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(134, 205, 198, 0.2);
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: #86CDC6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.45;
+  direction: ltr;
+  text-align: left;
+}
+
 .learning-box {
   border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
   background: color-mix(in srgb, var(--accent) 8%, var(--ink));

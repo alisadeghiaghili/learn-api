@@ -34,6 +34,33 @@ const GITHUB_MARK =
 const VISITOR_ICON =
   '<svg class="visitor-icon" viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0-2.21-2.69-4-6-4s-6 1.79-6 4v1h12v-1zm-1.07 0H3.07C3.56 11.83 5.48 11 8 11s4.44.83 4.93 2z"/></svg>';
 
+/**
+ * Format a code snippet instruction for the code editor based on current level and language.
+ *
+ * @param {import('./game.js').GoalItem} item
+ * @param {Level} level
+ * @returns {string}
+ */
+export function editorSnippetForGoal(item, level) {
+  if (item.kind === 'code') {
+    return item.label;
+  }
+  if (item.kind === 'endpoint') {
+    if (level.language === 'r') {
+      const parts = item.label.split(' ');
+      const m = (parts[0] || 'GET').toLowerCase();
+      const p = parts[1] || '/';
+      return `#* @${m} ${p.replace(/\{(\w+)\}/g, '<$1>')}`;
+    }
+    const parts = item.label.split(' ');
+    const method = (parts[0] || 'GET').toLowerCase();
+    const path = parts[1] || '/';
+    const statusPart = item.status && item.status !== 200 ? `, status_code=${item.status}` : '';
+    return `@app.${method}("${path}"${statusPart})`;
+  }
+  return item.label;
+}
+
 class App {
   /** @param {HTMLElement} root */
   constructor(root) {
@@ -598,7 +625,7 @@ class App {
       } else if (act?.type === 'edit') {
         boxTitle = u.nextStepTitle.edit;
         prompt = u.nextStepPrompt.edit;
-        cmd = act.item.label;
+        cmd = editorSnippetForGoal(act.item, lv);
         note = u.editNext(act.item);
         isCode = true;
       }
@@ -620,6 +647,7 @@ class App {
     dock.innerHTML = `
       <h2>${escapeHtml(lv.name)}</h2>
       <p class="objective">${escapeHtml(lv.objective)}</p>
+      ${lv.pattern ? `<div class="pattern-box"><div class="next-title">${escapeHtml(u.patternTitle)}</div><pre class="pattern-code"><code>${escapeHtml(lv.pattern)}</code></pre></div>` : ''}
       ${lv.learning?.length ? `<div class="learning-box"><div class="next-title">${escapeHtml(u.youAreLearning)}</div>${list(lv.learning)}</div>` : ''}
       ${lv.fieldNotes?.length ? `<div class="field-box"><div class="next-title">${escapeHtml(u.fieldNotesTitle)}</div>${list(lv.fieldNotes)}</div>` : ''}
       <div class="par-note">${escapeHtml(golfNote)}</div>
