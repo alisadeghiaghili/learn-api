@@ -2,22 +2,29 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { en } from '../js/i18n/en.js';
 import { fa } from '../js/i18n/fa.js';
+import { de } from '../js/i18n/de.js';
 import { LEVELS, getLocalizedLevel } from '../js/levels.js';
 import { FA_DIALOGS } from '../js/i18n/fa-dialogs.js';
+import { DE_DIALOGS } from '../js/i18n/de-dialogs.js';
 
 test('i18n: catalogs have consistent keys', () => {
   assert.equal(en.locale, 'en');
   assert.equal(en.dir, 'ltr');
   assert.equal(fa.locale, 'fa');
   assert.equal(fa.dir, 'rtl');
+  assert.equal(de.locale, 'de');
+  assert.equal(de.dir, 'ltr');
 
   const enKeys = Object.keys(en.ui).sort();
   const faKeys = Object.keys(fa.ui).sort();
+  const deKeys = Object.keys(de.ui).sort();
 
   assert.deepEqual(enKeys, faKeys, 'en and fa ui keys must match exactly');
+  assert.deepEqual(enKeys, deKeys, 'en and de ui keys must match exactly');
+  assert.deepEqual(faKeys, deKeys, 'fa and de ui keys must match exactly');
 });
 
-test('i18n: every level has complete curriculum metadata and Persian translation', () => {
+test('i18n: every level has complete curriculum metadata and translations', () => {
   for (const level of LEVELS) {
     assert.ok(level.id, 'level must have id');
     assert.ok(level.name, `level ${level.id} must have name`);
@@ -33,14 +40,24 @@ test('i18n: every level has complete curriculum metadata and Persian translation
     assert.ok(level.fa.objective, `level ${level.id} must have fa.objective`);
     assert.equal(level.fa.learning.length, 3, `level ${level.id} fa.learning must have 3 items`);
     assert.equal(level.fa.fieldNotes.length, 3, `level ${level.id} fa.fieldNotes must have 3 items`);
+
+    // German translations
+    assert.ok(level.de, `level ${level.id} must have de localization`);
+    assert.ok(level.de.name, `level ${level.id} must have de.name`);
+    assert.ok(level.de.objective, `level ${level.id} must have de.objective`);
+    assert.equal(level.de.learning.length, 3, `level ${level.id} de.learning must have 3 items`);
+    assert.equal(level.de.fieldNotes.length, 3, `level ${level.id} de.fieldNotes must have 3 items`);
   }
 });
 
-test('i18n: FA_DIALOGS covers levels with startDialog', () => {
+test('i18n: dialogs cover levels with startDialog', () => {
   for (const level of LEVELS) {
     if (level.startDialog && level.startDialog.length > 0) {
       assert.ok(FA_DIALOGS[level.id], `FA_DIALOGS must cover level ${level.id}`);
       assert.ok(FA_DIALOGS[level.id].intro, `FA_DIALOGS[${level.id}] must have intro slides`);
+
+      assert.ok(DE_DIALOGS[level.id], `DE_DIALOGS must cover level ${level.id}`);
+      assert.ok(DE_DIALOGS[level.id].intro, `DE_DIALOGS[${level.id}] must have intro slides`);
     }
   }
 });
@@ -56,6 +73,12 @@ test('i18n: getLocalizedLevel applies correct locale', () => {
   assert.equal(faView.objective, level.fa.objective);
   assert.deepEqual(faView.learning, level.fa.learning);
   assert.deepEqual(faView.fieldNotes, level.fa.fieldNotes);
+
+  const deView = getLocalizedLevel(level, 'de');
+  assert.equal(deView.name, level.de.name);
+  assert.equal(deView.objective, level.de.objective);
+  assert.deepEqual(deView.learning, level.de.learning);
+  assert.deepEqual(deView.fieldNotes, level.de.fieldNotes);
 });
 
 test('i18n: lesson navigation keys exist and format correctly', () => {
@@ -68,5 +91,9 @@ test('i18n: lesson navigation keys exist and format correctly', () => {
   assert.equal(fa.ui.next, 'بعدی');
   assert.equal(fa.ui.startLevel, 'شروع مرحله');
   assert.equal(fa.ui.levelMeta('http-01', 'آزمون'), 'مرحله http-01 — آزمون');
-});
 
+  assert.equal(de.ui.back, 'Zurück');
+  assert.equal(de.ui.next, 'Weiter');
+  assert.equal(de.ui.startLevel, 'Level starten');
+  assert.equal(de.ui.levelMeta('http-01', 'Test'), 'Level http-01 — Test');
+});

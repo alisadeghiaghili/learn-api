@@ -326,7 +326,7 @@ class App {
     const n = await getVisitorCount();
     const stat = this.root.querySelector('#visitor-stat');
     if (n === null || !stat) return;
-    this.root.querySelector('#visitor-count').textContent = n.toLocaleString(getLocale() === 'fa' ? 'fa-IR' : 'en-US');
+    this.root.querySelector('#visitor-count').textContent = n.toLocaleString(getLocale() === 'fa' ? 'fa-IR' : getLocale() === 'de' ? 'de-DE' : 'en-US');
     stat.hidden = false;
   }
 

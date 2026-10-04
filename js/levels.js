@@ -8,6 +8,8 @@
  */
 
 import { FA_DIALOGS } from './i18n/fa-dialogs.js';
+import { DE_DIALOGS } from './i18n/de-dialogs.js';
+import { DE_LEVELS } from './i18n/de-levels.js';
 
 /** @typedef {import('./engine.js').HttpMethod} HttpMethod */
 
@@ -28,6 +30,7 @@ import { FA_DIALOGS } from './i18n/fa-dialogs.js';
  * @property {object[]} startDialog
  * @property {string} [editorLabel]
  * @property {{ name?: string, objective?: string, hint?: string, learning?: string[], fieldNotes?: string[] }} [fa]
+ * @property {{ name?: string, objective?: string, hint?: string, learning?: string[], fieldNotes?: string[] }} [de]
  */
 
 /** @type {Level[]} */
@@ -1555,37 +1558,72 @@ def create_user():
   },
 };
 
+for (const level of LEVELS) {
+  level.de = DE_LEVELS[level.id];
+}
+
 /**
  * Localize level based on requested language.
  *
  * @param {Level} level
- * @param {'en'|'fa'} [lang='en']
+ * @param {'en'|'fa'|'de'} [lang='en']
  * @returns {Level}
  */
 export function getLocalizedLevel(level, lang = 'en') {
-  if (lang !== 'fa' || !level.fa) return level;
-  const dlg = FA_DIALOGS[level.id];
-  /** @type {object[]} */
-  let startDialog = level.startDialog;
-  if (dlg) {
-    startDialog = [{ type: 'ModalAlert', markdowns: dlg.intro }];
-    if (dlg.demo) {
-      startDialog.push({
-        type: 'ApiDemo',
-        beforeMarkdowns: [dlg.demo.before],
-        afterMarkdowns: [dlg.demo.after],
-        command: dlg.demo.command,
-      });
+  if (lang === 'fa' && level.fa) {
+    const dlg = FA_DIALOGS[level.id];
+    /** @type {object[]} */
+    let startDialog = level.startDialog;
+    if (dlg) {
+      startDialog = [{ type: 'ModalAlert', markdowns: dlg.intro }];
+      if (dlg.demo) {
+        startDialog.push({
+          type: 'ApiDemo',
+          beforeMarkdowns: [dlg.demo.before],
+          afterMarkdowns: [dlg.demo.after],
+          command: dlg.demo.command,
+        });
+      }
+      startDialog.push({ type: 'GoalList' });
     }
-    startDialog.push({ type: 'GoalList' });
+    return {
+      ...level,
+      name: level.fa.name || level.name,
+      objective: level.fa.objective || level.objective,
+      hint: level.fa.hint || level.hint,
+      learning: level.fa.learning || level.learning,
+      fieldNotes: level.fa.fieldNotes || level.fieldNotes,
+      startDialog,
+    };
   }
-  return {
-    ...level,
-    name: level.fa.name || level.name,
-    objective: level.fa.objective || level.objective,
-    hint: level.fa.hint || level.hint,
-    learning: level.fa.learning || level.learning,
-    fieldNotes: level.fa.fieldNotes || level.fieldNotes,
-    startDialog,
-  };
+
+  if (lang === 'de' && level.de) {
+    const dlg = DE_DIALOGS[level.id];
+    /** @type {object[]} */
+    let startDialog = level.startDialog;
+    if (dlg) {
+      startDialog = [{ type: 'ModalAlert', markdowns: dlg.intro }];
+      if (dlg.demo) {
+        startDialog.push({
+          type: 'ApiDemo',
+          beforeMarkdowns: [dlg.demo.before],
+          afterMarkdowns: [dlg.demo.after],
+          command: dlg.demo.command,
+        });
+      }
+      startDialog.push({ type: 'GoalList' });
+    }
+    return {
+      ...level,
+      name: level.de.name || level.name,
+      objective: level.de.objective || level.objective,
+      hint: level.de.hint || level.hint,
+      learning: level.de.learning || level.learning,
+      fieldNotes: level.de.fieldNotes || level.fieldNotes,
+      startDialog,
+    };
+  }
+
+  return level;
 }
+

@@ -4,34 +4,37 @@
 
 import { en } from './en.js';
 import { fa } from './fa.js';
+import { de } from './de.js';
 
 const STORAGE_KEY = 'learnapi.locale';
-const catalogs = { en, fa };
-export const LOCALES = ['en', 'fa'];
+const catalogs = { en, fa, de };
+export const LOCALES = ['en', 'fa', 'de'];
 
 let current = 'en';
 
 /**
  * Detect user locale from localStorage or browser.
- * @returns {'en'|'fa'}
+ * @returns {'en'|'fa'|'de'}
  */
 export function detectLocale() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === 'en' || saved === 'fa') return saved;
+    if (saved === 'en' || saved === 'fa' || saved === 'de') return saved;
   } catch {
     /* ignore */
   }
   const nav = typeof navigator !== 'undefined' ? navigator.language : '';
-  if (nav && (nav.toLowerCase().startsWith('fa') || nav.toLowerCase().startsWith('pe'))) {
-    return 'fa';
+  if (nav) {
+    const l = nav.toLowerCase();
+    if (l.startsWith('fa') || l.startsWith('pe')) return 'fa';
+    if (l.startsWith('de')) return 'de';
   }
   return 'en';
 }
 
 /**
  * Get active locale.
- * @returns {'en'|'fa'}
+ * @returns {'en'|'fa'|'de'}
  */
 export function getLocale() {
   return current;
@@ -39,10 +42,10 @@ export function getLocale() {
 
 /**
  * Set active locale.
- * @param {'en'|'fa'} locale
+ * @param {'en'|'fa'|'de'} locale
  */
 export function setLocale(locale) {
-  if (locale !== 'en' && locale !== 'fa') return;
+  if (locale !== 'en' && locale !== 'fa' && locale !== 'de') return;
   current = locale;
   try {
     localStorage.setItem(STORAGE_KEY, locale);
@@ -63,7 +66,7 @@ export function applyDocumentLocale() {
 
 /**
  * Initialize locale on boot.
- * @returns {'en'|'fa'}
+ * @returns {'en'|'fa'|'de'}
  */
 export function initLocale() {
   current = detectLocale();

@@ -1,0 +1,256 @@
+/**
+ * German UI catalog. Console command names, HTTP methods and code stay
+ * untranslated in every locale; only surrounding copy is localized.
+ */
+
+export const de = {
+  locale: 'de',
+  dir: 'ltr',
+  ui: {
+    // toolbar
+    sandboxMode: 'Sandbox-Modus',
+    levels: 'Level',
+    lesson: 'Lektion',
+    lessonTitle: 'Einführungs-Folien für dieses Level wiederholen',
+    guide: 'Guide',
+    hint: 'Hinweis',
+    solution: 'Lösung',
+    undo: 'Rückgängig',
+    reset: 'Zurücksetzen',
+    sandboxBtn: 'Sandbox',
+    help: 'Hilfe',
+    uiGuideTitle: 'UI-Übersicht: Funktion der Bereiche',
+    language: 'Sprache',
+    menuLabel: 'Menü',
+    githubTitle: 'GitHub: Quellcode und Issues',
+    support: 'Buy me a coffee',
+    supportTitle: 'Den Autor unterstützen',
+    visitorsTitle: 'Lernende, die hier geübt haben',
+    titleLine: (id, name, par) => `${id} · ${name} · Ideal: ${par} Befehle`,
+    guidePanel: 'Lernhilfe-Panel',
+
+    // workspace
+    tabPipeline: 'Pipeline',
+    tabSurface: 'API-Surface',
+    tabOpenapi: 'OpenAPI',
+    editorRun: 'Run',
+    openapiPlaceholder: '// Run drücken zum Kompilieren',
+    consoleTitle: 'Konsole',
+
+    // dock (guide)
+    guideTitle: 'Lernhilfe',
+    guideSubtitle: 'Ständiges Panel. Zeigt im Level Konzepte, Praxishinweise und die Lösungs-Checkliste.',
+    startHere: 'Hier starten',
+    startHereItems: [
+      'Öffne **Level** und beginne mit HTTP-Grundlagen: Was ist ein Endpoint?',
+      'Tippe `help` in die Konsole für die Befehlsliste',
+      'Drücke **Run** (`Strg+Enter`), um den Editor im Mock-Server zu kompilieren',
+      '`call GET /` eingeben, um einen Request zu senden und die Pipeline zu sehen',
+    ],
+    sandboxTip: 'Sandbox-Tipp',
+    sandboxTipItems: [
+      'Pipeline: Client → Router → Handler → Response',
+      'Konsole: `call POST /users body={"name":"ada"}`',
+      'Der OpenAPI-Tab zeigt das Live-Dokument für deinen Code',
+      'Fortschritt wird im Browser gespeichert (localStorage + Cookie)',
+    ],
+    noActiveLevel: 'Kein aktives Level',
+    noActiveLevelDetail: 'Level → Wähle eine Aufgabe, um die Checkliste hier zu sehen',
+    guideFlashNote: 'Der Toolbar-Button **Guide** hebt dieses Panel hervor. Es bleibt über die volle Seitenhöhe geöffnet.',
+    youAreLearning: 'Lernziele',
+    fieldNotesTitle: 'In Produktion (Praxishinweise)',
+    typeNextTitle: 'Nächster Schritt (orange hervorgehoben)',
+    remainingLabel: 'verbleibend',
+    wrongCommandNote: 'Anderes Ergebnis? Du bleibst hier und der Fortschritt bleibt erhalten. Verlauf: ↑ / ↓',
+    allSolutionMet: 'Alle Ziele dieses Levels sind erfüllt.',
+    nowChip: 'jetzt',
+    stateNotes: 'Offene Ziele:',
+    bestSoFar: (cmds, par) => `Bisheriges Bestergebnis: ${cmds} Befehle · Ideal: ${par}`,
+    idealSolution: (par) => `Ideal: ${par} Befehle (weniger oder gleich ist top)`,
+    solvedBanner: (n) => `Level gelöst${n !== null ? ` in ${n} Befehlen` : ''}.`,
+    targetBadge: {
+      editor: 'Editor',
+      run: 'Editor → Run',
+      openapi: 'OpenAPI',
+      console: 'Konsole',
+    },
+    targetActionHint: {
+      editor: 'server.py',
+      run: 'Strg+Enter',
+      openapi: 'contract',
+      console: 'api $',
+    },
+    nextStepTitle: {
+      edit: 'Nächster Schritt: Im Code-Editor schreiben',
+      run: 'Nächster Schritt: Server kompilieren (Run)',
+      call: 'Nächster Schritt: In Konsole testen',
+    },
+    nextStepPrompt: {
+      edit: 'Im Editor ergänzen:',
+      run: 'Code kompilieren:',
+      call: 'Im Terminal eingeben:',
+    },
+    goalDetail: (g) => {
+      if (g.kind === 'code') return 'Im Editor schreiben: Code muss diesen Baustein enthalten';
+      if (g.kind === 'endpoint') return `Mit Run kompilieren: Route registrieren${g.status ? ` · Status ${g.status}` : ''}`;
+      if (g.kind === 'openapi') return 'OpenAPI-Tab: Dokument muss dieses Schema oder diesen Pfad enthalten';
+      if (g.kind === 'call') return `Konsole: Request senden · muss Status ${g.expectStatus} liefern${g.expectBody ? ' · Payload muss passen' : ''}`;
+      return '';
+    },
+    runNext: 'Drücke Run (Strg+Enter) im Editor, um den Mock-Server zu kompilieren',
+    editNext: (g) => {
+      if (g.kind === 'code') return `Im Editor: "${g.label}" schreiben, danach Run drücken`;
+      if (g.kind === 'endpoint') return 'Im Editor: Diese Route definieren, danach Run drücken';
+      return 'Im Editor: Modelle/Routen für dieses Schema definieren, danach Run drücken';
+    },
+    allDoneNext: 'Alle Ziele erfüllt',
+
+    // terminal
+    termNext: 'Weiter',
+    termTabNote: 'Tab vervollständigt wortweise',
+    termPlaceholder: (cmd) => `Weiter: ${cmd} (Tab vervollständigt wortweise)`,
+    termPlaceholderIdle: 'Befehl eingeben, z. B. help',
+    welcomeLine: 'welcome to learn <api>',
+    welcomeSub: 'Interaktive API-Sandbox. Tippe `help` oder `levels`, um das erste Tutorial zu starten.',
+    sandboxSeeded: 'Sandbox ist mit einer FastAPI-Start-App bereit. Passe sie an, drücke Run und teste `call GET /`.',
+    progressSaved: 'Fortschritt wird im Browser gespeichert (localStorage + Cookie). Du kannst jederzeit zurückkehren.',
+    resumeLines: (done, total, pct, nextName) => [
+      `Willkommen zurück. Fortschritt: ${done}/${total} Level (${pct}%).`,
+      nextName ? `Nächstes Level: ${nextName}` : 'Alle Level abgeschlossen.',
+      'Öffne Level zum Fortfahren. Tippe `goal` im Level für die Checkliste.',
+    ],
+    loadedLevel: (name) => `geladen: ${name}`,
+    sandboxFree: 'Sandbox: freies Experimentieren',
+    serverNotRunning: 'Server läuft nicht. Bitte zuerst Run drücken',
+    runSummary: (n, title) => `run: ${n} Route(n) · ${title}`,
+    editorWarn: 'mit Warnungen kompiliert',
+    editorCompiled: (n, lang) => `${n} Route${n === 1 ? '' : 'n'} · ${lang}`,
+    editorGoalsOpen: (n) => `${n} Ziel(e) offen`,
+    editorSolved: 'gelöst',
+    nothingToUndo: 'nichts zum Rückgängigmachen',
+    undoMeta: 'zur vorherigen Ausführung zurückgekehrt',
+    resetMeta: (name) => `zurückgesetzt: ${name}`,
+    solutionLoaded: 'Lösung geladen, bitte Run drücken',
+    noSolution: 'keine Lösung in der Sandbox',
+    noHint: 'kein Hinweis hier',
+    levelsPick: 'Levelliste geöffnet',
+    nextMeta: (cmd) => `Weiter: ${cmd}`,
+    unknownCommand: (name) => `Unbekannter Befehl: ${name}. Versuche 'help'`,
+    usageCall: 'Syntax: call <METHOD> <path> [body=JSON] [headers=JSON]',
+    invalidJson: (what, raw) => `${what} ist kein gültiges JSON: ${raw}`,
+    goalsHeading: 'Ziele',
+    cmdHelp: {
+      help: 'diese Liste anzeigen',
+      levels: 'Level durchsuchen',
+      hint: 'Hinweis für das Level anzeigen',
+      run: 'Editor-Code im Mock-Server kompilieren',
+      call: 'Request senden, z. B. call GET /users body={"name":"ada"}',
+      openapi: 'OpenAPI-Dokument ausgeben',
+      goal: 'Level-Checkliste anzeigen',
+      solution: 'Lösung aufdecken (zählt für Golf-Wertung)',
+      undo: 'zur vorherigen Ausführung zurückgehen',
+      reset: 'Level neu starten',
+      next: 'zum nächsten Level gehen',
+      sandbox: 'freies Experimentieren',
+      clear: 'Konsole leeren',
+    },
+    helpTitle: 'Befehle',
+
+    // dialogs
+    back: 'Zurück',
+    next: 'Weiter',
+    startLevel: 'Level starten',
+    levelMeta: (id, name) => (name ? `Level ${id} — ${name}` : `Level ${id}`),
+    lessonReplayed: 'Lektions-Folien für dieses Level wiederholt.',
+    continueBtn: 'Weiter',
+    startBtn: 'Start',
+    closeBtn: 'Schließen',
+    tryDemo: 'Demo testen',
+    solveIt: 'Lösen',
+    demoLabel: 'Demo',
+    goalsTitle: 'Ziele',
+    goalsFooter: (par) => `Ideal: ${par} Befehle · \`hint\` · \`solution\``,
+
+    // welcome
+    welcomeTitle: 'welcome to learn api',
+    welcomeTitleHtml: 'welcome to learn <span class="logo-api">API</span>',
+    welcomeIntro: 'Interaktives **Web-API**-Tutorial — Sandbox + geführte Produktionslevel.',
+    welcomeBoard: 'Der Visualizer prüft **Client → Router → Handler → Response**. Das ist die Request-Pipeline, die LearnAPI simuliert.',
+    welcomeTracks:
+      '- Grundlagen: HTTP-Methoden, Statuscodes, Query- & Pfad-Parameter\n- FastAPI (Python): Pydantic-Schemas, Validierung, Dependency Injection\n- Plumber (R): Routing, Filter, Endpoint-Dekoratoren\n- OpenAPI: Contract-First-Schemas, interaktive Doku\n- Vergleichende Architektur: Produktionsmuster in Python vs. R',
+    welcomeMeta: 'Meta: `levels`, `run`, `call`, `openapi`, `hint`, `solution`, `undo`, `reset`.',
+    welcomeLevelsCount: (n) => `**${n}** Level enthalten. Öffne Level zum Starten oder bleibe in der Sandbox.`,
+    welcomeWhat: '**Was ist LearnAPI?**',
+    welcomeWhatBody:
+      'Ein browserbasiertes Labor für Web-APIs: Schreibe echten FastAPI- und Plumber-Code, kompiliere ihn in einer In-Memory-Mock-Engine, sende realistische HTTP-Requests und beobachte die Pipeline-Traces sowie Live-OpenAPI-Schemas in Echtzeit. Keine lokale Serverinstallation nötig.',
+    welcomePublisher: '**Herausgeber**',
+    welcomePublisherBody:
+      'Veröffentlicht und gepflegt von **Ali Sadeghi Aghili** — Programmierer, Data Engineer / Scientist, ML Engineer. [linktr.ee/aliaghili](https://linktr.ee/aliaghili)',
+    welcomeGithub: '- [GitHub — Quellcode & Issues](https://github.com/alisadeghiaghili/learn-api)',
+    welcomeCoffee: 'Buy Me a Coffee (unterstützt den Herausgeber):',
+    welcomeLevels: 'Level durchsuchen',
+    welcomeFirst: 'Level 1 starten',
+    welcomeSandbox: 'Sandbox öffnen',
+
+    // levels dialog
+    levelsTitle: 'Level',
+    pickChallenge: 'Wähle eine Herausforderung. Gelöste Level werden im Browser gespeichert.',
+    parNote: (par) => `Ideal: ${par}`,
+    solvedChip: 'gelöst',
+    legendTitle: 'Legende',
+    legendIdeal: '**Ideal** ist die Befehlsanzahl einer sauberen Lösung (Golf-Ziel, kein hartes Limit).',
+    legendSolved: '**Gelöst** bedeutet bestanden; die Zahl ist dein bisheriges Bestergebnis.',
+    seq: {
+      http: 'HTTP-Grundlagen',
+      fastapi: 'FastAPI (Python)',
+      plumber: 'Plumber (R)',
+      openapi: 'OpenAPI / Swagger',
+      compare: 'Stack-Vergleich',
+    },
+
+    // UI guide modal
+    uiGuide: [
+      { h: 'Toolbar', p: 'Level, Lektion (Folien wiederholen), Guide (Panel fokussieren), Hinweis, Lösung, Rückgängig, Zurücksetzen und Sandbox.' },
+      { h: 'Workspace', p: 'Links: Pipeline, API-Surface und Live-OpenAPI-Dokument. Rechts: Code-Editor mit Run.' },
+      { h: 'Konsole', p: 'Unten. Befehle bleiben auf Englisch. Tab vervollständigt den vorgeschlagenen Befehl wortweise.' },
+      { h: 'Lernhilfe', p: 'Rechte Seite. Konzepte, Praxishinweise und Checkliste; die orangefarbene Karte zeigt den nächsten Schritt.' },
+    ],
+
+    // celebration
+    levelCleared: 'LEVEL ABGESCHLOSSEN',
+    levelComplete: 'Level abgeschlossen',
+    levelSolvedBanner: '*** LEVEL GELÖST ***',
+    partyMode: '*** GRATULATION *** Konfetti-Zeit. Teilen-Buttons im Dialog.',
+    commandsUsed: (n, par) => `${n} Befehl${n === 1 ? '' : 'e'} benötigt · Ideal: ${par}`,
+    idealCommands: (par) => `Ideale Lösung: ${par} Befehle`,
+    cheers: [
+      'Sauberes Endpoint-Design. Der Contract hält.',
+      'Request-Pipeline erfolgreich durchlaufen. Ausgezeichnet.',
+      'Deterministische Ausgabe, produktionsreife Architektur.',
+      'Spezifikation ist valide und die Routen binden sauber.',
+    ],
+    statsUnder: (n, par) => `**${n}** Befehl${n === 1 ? '' : 'e'}. Ideal ist ${par}. Genau getroffen.`,
+    statsOver: (n, par) => `**${n}** Befehl${n === 1 ? '' : 'e'}. Ideal ist ${par}. Dennoch erfolgreich gemeistert.`,
+    statsIdeal: (par) => `Ideal für dieses Level: **${par}** Befehle.`,
+    progressLine: (done, total) => `${done} / ${total} Level gelöst · Fortschritt im Browser gespeichert`,
+    shareTitle: 'Fortschritt teilen',
+    styleList: 'Geübte Fähigkeiten',
+    solveMoreLevels: 'Löse weitere Level, um diese Liste zu füllen',
+    shareGroupLabel: 'In sozialen Netzwerken teilen',
+    linkedin: 'LinkedIn',
+    xTwitter: 'X',
+    facebook: 'Facebook',
+    copyPost: 'Beitrag kopieren',
+    copiedNotice: 'In die Zwischenablage kopiert.',
+    copyFailed: 'Konnte nicht automatisch kopiert werden.',
+    baskInIt: 'Hier bleiben',
+    celebrateOn: (id) => `Weiter: ${id}`,
+    browseLevels: 'Level durchsuchen',
+    nextCelebration: (id, name) => `Als Nächstes: **${name}** (\`${id}\`)`,
+    lastInPack: 'Das war das letzte Level. Nutze die Sandbox, um deine eigene API zu bauen.',
+    shareText: (name, done, total) =>
+      `Ich habe gerade "${name}" auf LearnAPI gelöst und stehe bei ${done}/${total} Leveln. Praxisnahe Web-APIs mit FastAPI, Plumber und OpenAPI direkt im Browser.`,
+    shareCta: 'Selbst ausprobieren',
+    shareHeadline: 'LearnAPI Fortschritt',
+  },
+};
