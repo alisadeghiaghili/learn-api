@@ -65,6 +65,68 @@ export function callGoalMet(parsed, c) {
 }
 
 /**
+ * Strip code comments based on programming language.
+ * Preserves Plumber annotations ('#*') in R.
+ *
+ * @param {string} code
+ * @param {string} [language='python']
+ * @returns {string}
+ */
+export function stripCodeComments(code, language = 'python') {
+  if (!code) return '';
+  const lines = code.split('\n');
+  const cleaned = lines.map((line) => {
+    if (language === 'r') {
+      if (/^\s*#\*/.test(line)) return line;
+    }
+    let inSingle = false;
+    let inDouble = false;
+    let out = '';
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      const prev = i > 0 ? line[i - 1] : '';
+      if (ch === "'" && prev !== '\\' && !inDouble) {
+        inSingle = !inSingle;
+        out += ch;
+      } else if (ch === '"' && prev !== '\\' && !inSingle) {
+        inDouble = !inDouble;
+        out += ch;
+      } else if (ch === '#' && !inSingle && !inDouble) {
+        if (language === 'r' && line[i + 1] === '*') {
+          out += ch;
+        } else {
+          break;
+        }
+      } else {
+        out += ch;
+      }
+    }
+    return out;
+  });
+  return cleaned.join('\n');
+}
+
+/**
+ * Check if the code satisfies a requirement without matching inside comments.
+ *
+ * @param {string} code
+ * @param {string} requirement
+ * @param {string} [language='python']
+ * @returns {boolean}
+ */
+export function codeMatchesRequirement(code, requirement, language = 'python') {
+  if (!requirement) return true;
+  const stripped = stripCodeComments(code, language);
+  const normReq = requirement.replace(/\s+/g, ' ').trim();
+  const normCode = stripped.replace(/\s+/g, ' ');
+  if (normCode.includes(normReq)) return true;
+  if (/^[A-Za-z_]\w*$/.test(normReq)) {
+    return new RegExp(`\\b${normReq}\\b`).test(stripped);
+  }
+  return false;
+}
+
+/**
  * Evaluate a level goal into an ordered checklist.
  * Chronological order:
  * 1. Code in editor (codeContains)
@@ -84,6 +146,7 @@ export function goalItems(parsed, code, goal) {
   /** @type {object|null} */
   let doc = null;
   const openapi = () => (doc ??= generateOpenAPI(parsed));
+  const lang = parsed?.language || 'python';
 
   // 1. Code editor text requirements
   for (const s of g.codeContains || []) {
@@ -91,7 +154,7 @@ export function goalItems(parsed, code, goal) {
       kind: 'code',
       target: 'editor',
       label: s,
-      done: !!parsed && code.includes(s),
+      done: !!parsed && !parsed.errors?.length && codeMatchesRequirement(code, s, lang),
     });
   }
 
@@ -223,6 +286,68 @@ export function extractCodeSnippet(source, label) {
       const re = new RegExp(`(class\\s+${className}[\\s\\S]*?)(?=\\n(?:@|class\\s|def\\s|$))`, 'm');
       const m = source.match(re);
       if (m) return m[1].trim();
+    }
+  }
+  if (/^(?:async\s+)?def\s+\w+/.test(label)) {
+    const fnName = (label.match(/def\s+(\w+)/) || [])[1];
+    if (fnName) {
+      const lines = source.split('\n');
+      let startIdx = -1;
+      let endIdx = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (new RegExp(`(?:async\\s+)?def\\s+${fnName}\\b`).test(lines[i])) {
+          startIdx = i;
+          while (startIdx > 0 && lines[startIdx - 1].trim().startsWith('@')) {
+            startIdx--;
+          }
+          endIdx = i;
+          while (
+            endIdx + 1 < lines.length &&
+            (lines[endIdx + 1].startsWith(' ') ||
+              lines[endIdx + 1].startsWith('\t') ||
+              lines[endIdx + 1].trim() === '')
+          ) {
+            endIdx++;
+          }
+          break;
+        }
+      }
+      if (startIdx !== -1) {
+        return lines.slice(startIdx, endIdx + 1).join('\n').trim();
+      }
+    }
+  }
+  if (label.startsWith('@app.')) {
+    const lines = source.split('\n');
+    let startIdx = -1;
+    let endIdx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes(label.trim())) {
+        startIdx = i;
+        endIdx = i;
+        while (
+          endIdx + 1 < lines.length &&
+          (lines[endIdx + 1].startsWith(' ') ||
+            lines[endIdx + 1].startsWith('\t') ||
+            lines[endIdx + 1].startsWith('@') ||
+            lines[endIdx + 1].trim() === '' ||
+            lines[endIdx + 1].trim().startsWith('def '))
+        ) {
+          endIdx++;
+          if (lines[endIdx].trim().startsWith('def ')) {
+            while (
+              endIdx + 1 < lines.length &&
+              (lines[endIdx + 1].startsWith(' ') ||
+                lines[endIdx + 1].startsWith('\t') ||
+                lines[endIdx + 1].trim() === '')
+            ) {
+              endIdx++;
+            }
+            break;
+          }
+        }
+        return lines.slice(startIdx, endIdx + 1).join('\n').trim();
+      }
     }
   }
   if (label.includes('Depends(') || label.includes('Header(') || label.includes('response_model=')) {

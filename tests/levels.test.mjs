@@ -4,6 +4,7 @@
  */
 import { parseSource, executeRequest, matchRoute } from '../js/engine.js';
 import { generateOpenAPI, openApiHas } from '../js/openapi.js';
+import { codeMatchesRequirement } from '../js/game.js';
 import { LEVELS } from '../js/levels.js';
 
 let passed = 0;
@@ -36,7 +37,7 @@ for (const level of LEVELS) {
     assert(found, `endpoint ${e.method} ${e.path}${e.status ? ` ${e.status}` : ''}`);
   }
   for (const s of g.codeContains || []) {
-    assert(code.includes(s), `code contains ${s}`);
+    assert(codeMatchesRequirement(code, s, lang), `code contains ${s}`);
   }
   for (const s of g.openapiHas || []) {
     assert(openApiHas(generateOpenAPI(parsed), s), `openapi ${s}`);

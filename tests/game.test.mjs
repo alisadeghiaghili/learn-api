@@ -117,19 +117,20 @@ test('editorSnippetForGoal provides complete handler with def and return', () =>
 test('incomplete code without handler or return cannot solve level http-01', () => {
   const lv1 = LEVELS.find((l) => l.id === 'http-01');
 
-  // Case 1: Bare decorator with no function definition
-  const bareDecorator = `from fastapi import FastAPI\napp = FastAPI()\n@app.get("/")`;
+  // Case 1: Bare decorator with no function definition and comments containing keywords
+  const bareDecorator = `from fastapi import FastAPI\napp = FastAPI()\n# TODO: Define @app.get("/") with def read_root() returning {"hello": "world"}\n@app.get("/")`;
   const parsedBare = parseSource(bareDecorator, 'python');
   assert.equal(parsedBare.routes.length, 0); // No route registered
   const itemsBare = goalItems(parsedBare, bareDecorator, lv1.goal);
   assert.equal(isSolved(itemsBare), false);
+  assert.equal(itemsBare[0].done, false); // def read_root(): must not be marked done
 
   // Case 2: Function with no return statement
   const noReturn = `from fastapi import FastAPI\napp = FastAPI()\n@app.get("/")\ndef read_root():\n    pass`;
   const parsedNoReturn = parseSource(noReturn, 'python');
   assert.equal(parsedNoReturn.routes.length, 1);
   const itemsNoReturn = goalItems(parsedNoReturn, noReturn, lv1.goal);
-  assert.equal(isSolved(itemsNoReturn), false); // Fails because return is required and body is null
+  assert.equal(isSolved(itemsNoReturn), false); // Fails because call expectations not met
 
   // Case 3: Complete function returning the expected body
   const complete = `from fastapi import FastAPI\napp = FastAPI()\n@app.get("/")\ndef read_root():\n    return {"hello": "world"}`;
@@ -137,3 +138,13 @@ test('incomplete code without handler or return cannot solve level http-01', () 
   const itemsComplete = goalItems(parsedComplete, complete, lv1.goal);
   assert.equal(isSolved(itemsComplete), true);
 });
+
+test('comments do not satisfy codeContains requirements', () => {
+  const codeWithComment = `from fastapi import FastAPI\napp = FastAPI()\n# TODO: def read_root(): return {"hello": "world"}\n`;
+  const parsed = parseSource(codeWithComment, 'python');
+  const items = goalItems(parsed, codeWithComment, {
+    codeContains: ['def read_root():'],
+  });
+  assert.equal(items[0].done, false);
+});
+

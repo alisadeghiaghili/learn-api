@@ -75,7 +75,7 @@ def read_root():
     goal: {
       endpoints: [{ method: 'GET', path: '/' }],
       calls: [{ method: 'GET', path: '/', expectStatus: 200, expectBody: { hello: 'world' } }],
-      codeContains: ['@app.get("/")', 'return'],
+      codeContains: ['def read_root():'],
     },
     startDialog: [
       {
@@ -161,7 +161,7 @@ def create_item():
         { method: 'POST', path: '/items', status: 201 },
       ],
       calls: [{ method: 'POST', path: '/items', expectStatus: 201, expectBody: { id: 1, name: 'widget' } }],
-      codeContains: ['@app.post("/items", status_code=201)', 'return'],
+      codeContains: ['@app.post("/items", status_code=201)', 'def create_item():'],
     },
     startDialog: [
       {
@@ -243,7 +243,7 @@ def get_user(user_id: int):
       calls: [
         { method: 'GET', path: '/users/42', expectStatus: 200, expectBody: { id: 42, name: 'ada' } },
       ],
-      codeContains: ['@app.get("/users/{user_id}")', 'return'],
+      codeContains: ['@app.get("/users/{user_id}")', 'def get_user(user_id: int):'],
     },
     startDialog: [
       {
@@ -321,7 +321,7 @@ def search(q: str = "", limit: int = 10):
           expectBody: { q: 'ada', limit: 2 },
         },
       ],
-      codeContains: ['return'],
+      codeContains: ['def search(q: str'],
     },
     startDialog: [
       {
@@ -401,7 +401,7 @@ def create_user(user: User):
           expectBody: { name: 'ada' },
         },
       ],
-      codeContains: ['class User(BaseModel):', 'return'],
+      codeContains: ['class User(BaseModel):', 'def create_user(user: User):'],
       openapiHas: ['components.schemas.User'],
     },
     startDialog: [
@@ -478,7 +478,7 @@ def delete_note(note_id: int):
         { method: 'DELETE', path: '/notes/{note_id}', status: 204 },
       ],
       calls: [{ method: 'DELETE', path: '/notes/7', expectStatus: 204 }],
-      codeContains: ['@app.delete("/notes/{note_id}", status_code=204)', 'return'],
+      codeContains: ['@app.delete("/notes/{note_id}", status_code=204)', 'def delete_note(note_id: int):'],
     },
     startDialog: [
       {
@@ -724,7 +724,7 @@ def info(settings: dict = Depends(get_settings)):
     goal: {
       endpoints: [{ method: 'GET', path: '/info' }],
       calls: [{ method: 'GET', path: '/info', expectStatus: 200, expectBody: { app: 'LearnAPI' } }],
-      codeContains: ['Depends(get_settings)', 'return'],
+      codeContains: ['Depends(get_settings)'],
     },
     startDialog: [
       {
@@ -804,7 +804,7 @@ def admin(api_key: str = Header(...)):
         { method: 'GET', path: '/admin', expectStatus: 401 },
         { method: 'GET', path: '/admin', headers: { 'api-key': 'secret' }, expectStatus: 200, expectBody: { who: 'admin' } },
       ],
-      codeContains: ['Header(...)', 'return'],
+      codeContains: ['Header(...)'],
       openapiHas: ['components.securitySchemes.apiKeyAuth'],
     },
     startDialog: [
@@ -885,7 +885,7 @@ def get_user(user_id: int):
       calls: [
         { method: 'GET', path: '/users/42', expectStatus: 200, expectBody: { id: 42, name: 'ada' } },
       ],
-      codeContains: ['response_model=UserOut', 'return'],
+      codeContains: ['response_model=UserOut'],
       openapiHas: ['components.schemas.UserOut', 'paths./users/{user_id}.get.responses'],
     },
     startDialog: [
@@ -1259,7 +1259,7 @@ def create_item(item: Item):
 `,
     goal: {
       endpoints: [{ method: 'POST', path: '/items', status: 201 }],
-      codeContains: ['class Item(BaseModel):', 'return'],
+      codeContains: ['class Item(BaseModel):'],
       openapiHas: ['components.schemas.Item', 'paths./items.post.requestBody'],
     },
     startDialog: [
@@ -1338,7 +1338,7 @@ def metrics():
         { method: 'GET', path: '/health', expectStatus: 200, expectBody: { status: 'ok' } },
         { method: 'GET', path: '/metrics', expectStatus: 200, expectBody: { status: 'ok' } },
       ],
-      codeContains: ['@app.get("/health")', '@app.get("/metrics")', 'return'],
+      codeContains: ['@app.get("/health")', '@app.get("/metrics")'],
     },
     startDialog: [
       {

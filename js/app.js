@@ -34,6 +34,9 @@ const GITHUB_MARK =
 const VISITOR_ICON =
   '<svg class="visitor-icon" viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0-2.21-2.69-4-6-4s-6 1.79-6 4v1h12v-1zm-1.07 0H3.07C3.56 11.83 5.48 11 8 11s4.44.83 4.93 2z"/></svg>';
 
+const API_LOGO_SVG =
+  '<svg class="brand-mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="API" width="22" height="22"><rect width="64" height="64" rx="14" fill="#073d3b"/><g transform="translate(12 12) scale(1.6667)" fill="#85cdc6"><path d="M12 .0387C5.3729.0384.0003 5.3931 0 11.9988c-.001 6.6066 5.372 11.9628 12 11.9625 6.628.0003 12.001-5.3559 12-11.9625-.0003-6.6057-5.3729-11.9604-12-11.96m-.829 5.4153h7.55l-7.5805 5.3284h5.1828L5.279 18.5436q2.9466-6.5444 5.892-13.0896"/></g></svg>';
+
 class App {
   /** @param {HTMLElement} root */
   constructor(root) {
@@ -100,7 +103,7 @@ class App {
     this.root.innerHTML = `
       <div class="app-main">
         <header class="toolbar">
-          <div class="brand">Learn<span>API</span></div>
+          <div class="brand">${API_LOGO_SVG}<span class="brand-text">Learn<span class="brand-accent">API</span></span></div>
           <div class="level-title" id="level-title"></div>
           <div class="toolbar-actions">
             <div class="lang-menu">

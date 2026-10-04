@@ -80,9 +80,24 @@ body {
   color: var(--text);
   display: inline-flex;
   align-items: center;
+  gap: 8px;
 }
 
-.brand span,
+.brand-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  display: block;
+}
+
+.brand-text {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text);
+}
+
+.brand-accent,
 .logo-api {
   color: var(--api-logo);
   font-weight: 650;
