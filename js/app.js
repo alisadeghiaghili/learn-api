@@ -678,8 +678,14 @@ class App {
   }
 
   replayLesson() {
-    if (this.mode === 'level' && this.level.startDialog?.length) this.showIntro(this.level);
-    else this.showWelcome();
+    const u = ui();
+    if (this.mode === 'level' && this.level.startDialog?.length) {
+      this.showIntro(this.level);
+      this.print(u.lessonReplayed, 'system');
+      this.term.focus();
+    } else {
+      this.showWelcome();
+    }
   }
 
   openUiHelp() {
@@ -731,52 +737,91 @@ class App {
   showIntro(level) {
     const u = ui();
     const steps = level.startDialog || [];
-    let i = 0;
-    const next = () => {
-      if (i >= steps.length) {
-        this.term.focus();
-        return;
+    if (!steps.length) return;
+    let idx = 0;
+
+    const show = () => {
+      const step = steps[idx];
+      const actions = [];
+      const modalRef = { close: () => {} };
+
+      if (idx > 0) {
+        actions.push({
+          label: u.back,
+          className: 'ghost',
+          onClick: () => {
+            idx -= 1;
+            modalRef.close();
+            show();
+          },
+        });
       }
-      const step = steps[i++];
-      const last = i >= steps.length;
-      const continueAction = {
-        label: last ? u.startBtn : u.continueBtn,
-        className: 'primary',
-        onClick: next,
-      };
+
+      if (step.type === 'ApiDemo' && step.command) {
+        actions.push({
+          label: u.tryDemo,
+          className: 'ghost',
+          onClick: () => {
+            const cmd = step.command || '';
+            if (cmd.startsWith('call ')) {
+              this.run();
+              const req = parseCall(cmd.slice(5));
+              if (!('error' in req)) this.doCall(req);
+            }
+            if (idx < steps.length - 1) {
+              idx += 1;
+              modalRef.close();
+              show();
+            } else {
+              modalRef.close();
+              this.term.focus();
+            }
+          },
+        });
+      }
+
+      if (idx < steps.length - 1) {
+        actions.push({
+          label: u.next,
+          className: 'primary',
+          onClick: () => {
+            idx += 1;
+            modalRef.close();
+            show();
+          },
+        });
+      } else {
+        actions.push({
+          label: u.startLevel,
+          className: 'primary',
+          onClick: () => {
+            modalRef.close();
+            this.term.focus();
+          },
+        });
+      }
+
+      let title = step.title;
+      let bodyHtml = '';
+
       if (step.type === 'ModalAlert') {
-        showModal({
-          title: level.name,
-          bodyHtml: renderMarkdown(step.markdowns.join('\n\n')),
-          closeLabel: u.closeBtn,
-          actions: [continueAction],
-        });
+        const mds = [...(step.markdowns || [])];
+        if (!title && mds.length > 0 && mds[0].startsWith('## ')) {
+          title = mds[0].replace(/^##\s*/, '');
+          mds.shift();
+        }
+        if (!title) {
+          title = u.levelMeta(level.id, level.name);
+        }
+        bodyHtml = renderMarkdown(mds.join('\n\n'));
       } else if (step.type === 'ApiDemo') {
-        showModal({
-          title: level.name,
-          bodyHtml: `<div class="dialog-demo"><div class="demo-label">${escapeHtml(u.demoLabel)}</div>
-            ${renderMarkdown((step.beforeMarkdowns || []).join(' '))}
-            <pre>${escapeHtml(step.command || '')}</pre>
-            ${renderMarkdown((step.afterMarkdowns || []).join(' '))}</div>`,
-          closeLabel: u.closeBtn,
-          actions: [
-            {
-              label: u.tryDemo,
-              className: 'ghost',
-              onClick: () => {
-                const cmd = step.command || '';
-                if (cmd.startsWith('call ')) {
-                  this.run();
-                  const req = parseCall(cmd.slice(5));
-                  if (!('error' in req)) this.doCall(req);
-                }
-                next();
-              },
-            },
-            continueAction,
-          ],
-        });
+        title = title ?? u.levelMeta(level.id, level.name);
+        bodyHtml = `<div class="dialog-demo"><div class="demo-label">${escapeHtml(u.demoLabel)}</div>
+          ${renderMarkdown((step.beforeMarkdowns || []).join(' '))}
+          <pre>${escapeHtml(step.command || '')}</pre>
+          ${renderMarkdown((step.afterMarkdowns || []).join(' '))}</div>`;
       } else if (step.type === 'GoalList') {
+        title = u.goalsTitle;
         const goals = goalItems(null, '', level.goal)
           .map((g) => {
             const targetClass = `target-${g.target || g.kind}`;
@@ -790,17 +835,23 @@ class App {
             </li>`;
           })
           .join('');
-        showModal({
-          title: u.goalsTitle,
-          bodyHtml: `<ul class="goal-list">${goals}</ul><p class="muted-text">${renderMarkdown(u.goalsFooter(level.golf)).replace(/^<p>|<\/p>$/g, '')}</p>`,
-          closeLabel: u.closeBtn,
-          actions: [{ label: u.solveIt, className: 'primary', onClick: () => this.term.focus() }],
-        });
-      } else {
-        next();
+        bodyHtml = `<ul class="goal-list">${goals}</ul><p class="muted-text">${renderMarkdown(u.goalsFooter(level.golf)).replace(/^<p>|<\/p>$/g, '')}</p>`;
+      } else if (step.markdown) {
+        title = title ?? u.levelMeta(level.id, level.name);
+        bodyHtml = renderMarkdown(step.markdown);
       }
+
+      const m = showModal({
+        title,
+        bodyHtml,
+        closeLabel: u.closeBtn,
+        actions,
+        onClose: () => this.term.focus(),
+      });
+      modalRef.close = m.close;
     };
-    next();
+
+    show();
   }
 
   /** Confetti first, then the congratulation dialog on top. */

@@ -57,3 +57,16 @@ test('i18n: getLocalizedLevel applies correct locale', () => {
   assert.deepEqual(faView.learning, level.fa.learning);
   assert.deepEqual(faView.fieldNotes, level.fa.fieldNotes);
 });
+
+test('i18n: lesson navigation keys exist and format correctly', () => {
+  assert.equal(en.ui.back, 'Back');
+  assert.equal(en.ui.next, 'Next');
+  assert.equal(en.ui.startLevel, 'Start level');
+  assert.equal(en.ui.levelMeta('http-01', 'Test'), 'Level http-01 — Test');
+
+  assert.equal(fa.ui.back, 'قبلی');
+  assert.equal(fa.ui.next, 'بعدی');
+  assert.equal(fa.ui.startLevel, 'شروع مرحله');
+  assert.equal(fa.ui.levelMeta('http-01', 'آزمون'), 'مرحله http-01 — آزمون');
+});
+

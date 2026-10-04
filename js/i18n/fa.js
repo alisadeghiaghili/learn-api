@@ -157,6 +157,11 @@ export const fa = {
     helpTitle: 'دستورها',
 
     // dialogs
+    back: 'قبلی',
+    next: 'بعدی',
+    startLevel: 'شروع مرحله',
+    levelMeta: (id, name) => (name ? `مرحله ${id} — ${name}` : `مرحله ${id}`),
+    lessonReplayed: 'اسلایدهای درس برای این مرحله تکرار شد.',
     continueBtn: 'ادامه',
     startBtn: 'شروع',
     closeBtn: 'بستن',

@@ -157,6 +157,11 @@ export const en = {
     helpTitle: 'commands',
 
     // dialogs
+    back: 'Back',
+    next: 'Next',
+    startLevel: 'Start level',
+    levelMeta: (id, name) => (name ? `Level ${id} — ${name}` : `Level ${id}`),
+    lessonReplayed: 'Lesson slides replayed for this level.',
     continueBtn: 'Continue',
     startBtn: 'Start',
     closeBtn: 'Close',
