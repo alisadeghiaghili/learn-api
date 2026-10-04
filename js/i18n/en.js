@@ -81,6 +81,11 @@ export const en = {
       openapi: 'contract',
       console: 'api $',
     },
+    activeWindowBadge: {
+      edit: '● Write code',
+      run: '● Click Run',
+      call: '● Send request',
+    },
     nextStepTitle: {
       edit: 'Next step: Write in Code Editor',
       run: 'Next step: Compile Server (Run)',

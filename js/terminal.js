@@ -27,10 +27,12 @@ export class TerminalView {
         <div class="term-input-wrap">
           <input class="term-input" id="term-input" type="text" spellcheck="false" aria-label="Command" />
         </div>
+        <span class="target-focus-tag" id="term-focus-tag" hidden></span>
       </form>`;
     this.logEl = root.querySelector('#term-log');
     this.hintEl = root.querySelector('#term-hint');
     this.input = root.querySelector('#term-input');
+    this.focusTag = root.querySelector('#term-focus-tag');
     for (const l of opts.lines || []) this.append(l);
     root.querySelector('#term-form').addEventListener('submit', (e) => {
       e.preventDefault();
@@ -101,5 +103,17 @@ export class TerminalView {
 
   focus() {
     this.input.focus();
+  }
+
+  /** @param {string|null} text */
+  setFocusTag(text) {
+    if (!this.focusTag) return;
+    if (text) {
+      this.focusTag.textContent = text;
+      this.focusTag.hidden = false;
+    } else {
+      this.focusTag.hidden = true;
+      this.focusTag.textContent = '';
+    }
   }
 }

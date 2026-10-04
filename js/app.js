@@ -137,9 +137,12 @@ class App {
             <div id="viz-surface" class="viz-panel"></div>
             <pre id="openapi-view" class="viz-panel code-block"></pre>
           </section>
-          <section class="panel editor-wrap">
+          <section class="panel editor-wrap" id="editor-wrap">
             <div class="editor-head">
-              <label for="code-editor" id="editor-label">server.py</label>
+              <div class="editor-label-wrap">
+                <label for="code-editor" id="editor-label">server.py</label>
+                <span class="target-focus-tag" id="editor-focus-tag" hidden></span>
+              </div>
               <div class="editor-actions">
                 <span class="muted" id="editor-status"></span>
                 <button type="button" class="primary" id="btn-run">${escapeHtml(u.editorRun)}</button>
@@ -156,8 +159,12 @@ class App {
     this.els = {
       title: q('#level-title'),
       editor: q('#code-editor'),
+      editorWrap: q('#editor-wrap'),
+      editorFocusTag: q('#editor-focus-tag'),
       editorLabel: q('#editor-label'),
       editorStatus: q('#editor-status'),
+      btnRun: q('#btn-run'),
+      terminal: q('#terminal'),
       openapi: q('#openapi-view'),
       vizPipeline: q('#viz-pipeline'),
       vizSurface: q('#viz-surface'),
@@ -229,6 +236,17 @@ class App {
         ed.value = `${ed.value.slice(0, s)}    ${ed.value.slice(ed.selectionEnd)}`;
         ed.selectionStart = ed.selectionEnd = s + 4;
         ed.dispatchEvent(new Event('input'));
+      }
+    });
+    this.els.dock.addEventListener('click', (e) => {
+      const box = e.target.closest('.next-box:not(.met)');
+      if (!box) return;
+      const items = this.items();
+      const act = nextAction(items, { running: !!this.parsed, stale: this.isStale() });
+      if (act?.type === 'edit') {
+        this.els.editor?.focus();
+      } else {
+        this.term?.focus();
       }
     });
     document.addEventListener('click', (e) => {
@@ -548,6 +566,7 @@ class App {
           <li class="met"><div class="g-label">${escapeHtml(u.noActiveLevel)}</div><div class="g-detail">${escapeHtml(u.noActiveLevelDetail)}</div></li>
         </ul>
         <div class="par-note">${renderMarkdown(u.guideFlashNote).replace(/^<p>|<\/p>$/g, '')}</div>`;
+      this.updateWindowHighlights(null);
       return;
     }
 
@@ -627,6 +646,49 @@ class App {
       ${this.solvedFlash ? `<div class="solved-banner">${escapeHtml(u.solvedBanner(this.commandCount || null))}</div>` : ''}
       ${nextBlock}
       <ul class="goal-list">${rows}</ul>`;
+    this.updateWindowHighlights(act);
+  }
+
+  /**
+   * Highlights whichever window (editor or terminal) requires learner input.
+   *
+   * @param {{ type: 'run'|'call'|'edit', command?: string, item?: object } | null} act
+   */
+  updateWindowHighlights(act) {
+    const u = ui();
+    const edWrap = this.els.editorWrap;
+    const term = this.els.terminal;
+    const btnRun = this.els.btnRun;
+    const edTag = this.els.editorFocusTag;
+
+    edWrap?.classList.remove('target-active');
+    term?.classList.remove('target-active');
+    btnRun?.classList.remove('btn-run-pulse');
+    if (edTag) {
+      edTag.hidden = true;
+      edTag.textContent = '';
+    }
+    this.term?.setFocusTag?.(null);
+
+    if (!act || this.mode !== 'level' || this.solvedFlash) return;
+
+    if (act.type === 'edit') {
+      edWrap?.classList.add('target-active');
+      if (edTag) {
+        edTag.textContent = u.activeWindowBadge?.edit || '● Write code';
+        edTag.hidden = false;
+      }
+    } else if (act.type === 'call') {
+      term?.classList.add('target-active');
+      this.term?.setFocusTag?.(u.activeWindowBadge?.call || '● Send request');
+    } else if (act.type === 'run') {
+      edWrap?.classList.add('target-active');
+      btnRun?.classList.add('btn-run-pulse');
+      if (edTag) {
+        edTag.textContent = u.activeWindowBadge?.run || '● Click Run';
+        edTag.hidden = false;
+      }
+    }
   }
 
   focusGuide() {

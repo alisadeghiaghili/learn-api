@@ -22,6 +22,12 @@ test('i18n: catalogs have consistent keys', () => {
   assert.deepEqual(enKeys, faKeys, 'en and fa ui keys must match exactly');
   assert.deepEqual(enKeys, deKeys, 'en and de ui keys must match exactly');
   assert.deepEqual(faKeys, deKeys, 'fa and de ui keys must match exactly');
+
+  for (const cat of [en, fa, de]) {
+    assert.ok(cat.ui.activeWindowBadge?.edit, `${cat.locale} must have activeWindowBadge.edit`);
+    assert.ok(cat.ui.activeWindowBadge?.run, `${cat.locale} must have activeWindowBadge.run`);
+    assert.ok(cat.ui.activeWindowBadge?.call, `${cat.locale} must have activeWindowBadge.call`);
+  }
 });
 
 test('i18n: every level has complete curriculum metadata and translations', () => {

@@ -81,6 +81,11 @@ export const fa = {
       openapi: 'مستند قرارداد',
       console: 'api $',
     },
+    activeWindowBadge: {
+      edit: '● نوشتن کد',
+      run: '● کلیک روی Run',
+      call: '● ارسال درخواست',
+    },
     nextStepTitle: {
       edit: 'گام بعدی: نوشتن در ادیتور کد',
       run: 'گام بعدی: کامپایل سرور (Run)',
