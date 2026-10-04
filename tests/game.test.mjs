@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { goalItems, isSolved, nextAction, callCommand, callGoalMet, parserLanguage } from '../js/game.js';
+import { goalItems, isSolved, nextAction, callCommand, callGoalMet, parserLanguage, editorSnippetForGoal } from '../js/game.js';
 import { LEVELS } from '../js/levels.js';
 import { parseSource } from '../js/engine.js';
 
@@ -96,4 +96,44 @@ test('nextAction advises correct next step', () => {
 
   const allMet = [{ kind: 'endpoint', done: true }];
   assert.equal(nextAction(allMet, { running: true, stale: false }), null);
+});
+
+test('editorSnippetForGoal provides complete handler with def and return', () => {
+  const lv1 = LEVELS.find((l) => l.id === 'http-01');
+  const item1 = { kind: 'endpoint', label: 'GET /' };
+  const snippet1 = editorSnippetForGoal(item1, lv1);
+  assert.equal(snippet1.includes('@app.get("/")'), true);
+  assert.equal(snippet1.includes('def read_root():'), true);
+  assert.equal(snippet1.includes('return {"hello": "world"}'), true);
+
+  const lv2 = LEVELS.find((l) => l.id === 'http-02');
+  const item2 = { kind: 'endpoint', label: 'POST /items' };
+  const snippet2 = editorSnippetForGoal(item2, lv2);
+  assert.equal(snippet2.includes('@app.post("/items", status_code=201)'), true);
+  assert.equal(snippet2.includes('def create_item():'), true);
+  assert.equal(snippet2.includes('return {"id": 1, "name": "widget"}'), true);
+});
+
+test('incomplete code without handler or return cannot solve level http-01', () => {
+  const lv1 = LEVELS.find((l) => l.id === 'http-01');
+
+  // Case 1: Bare decorator with no function definition
+  const bareDecorator = `from fastapi import FastAPI\napp = FastAPI()\n@app.get("/")`;
+  const parsedBare = parseSource(bareDecorator, 'python');
+  assert.equal(parsedBare.routes.length, 0); // No route registered
+  const itemsBare = goalItems(parsedBare, bareDecorator, lv1.goal);
+  assert.equal(isSolved(itemsBare), false);
+
+  // Case 2: Function with no return statement
+  const noReturn = `from fastapi import FastAPI\napp = FastAPI()\n@app.get("/")\ndef read_root():\n    pass`;
+  const parsedNoReturn = parseSource(noReturn, 'python');
+  assert.equal(parsedNoReturn.routes.length, 1);
+  const itemsNoReturn = goalItems(parsedNoReturn, noReturn, lv1.goal);
+  assert.equal(isSolved(itemsNoReturn), false); // Fails because return is required and body is null
+
+  // Case 3: Complete function returning the expected body
+  const complete = `from fastapi import FastAPI\napp = FastAPI()\n@app.get("/")\ndef read_root():\n    return {"hello": "world"}`;
+  const parsedComplete = parseSource(complete, 'python');
+  const itemsComplete = goalItems(parsedComplete, complete, lv1.goal);
+  assert.equal(isSolved(itemsComplete), true);
 });

@@ -62,7 +62,7 @@ export const LEVELS = [
 
 app = FastAPI(title="Hello API")
 
-# TODO: Define a GET endpoint on "/" that returns a JSON object
+# TODO: Define @app.get("/") with def read_root() returning {"hello": "world"}
 `,
     solutionCode: `from fastapi import FastAPI
 
@@ -74,8 +74,8 @@ def read_root():
 `,
     goal: {
       endpoints: [{ method: 'GET', path: '/' }],
-      calls: [{ method: 'GET', path: '/', expectStatus: 200 }],
-      codeContains: ['@app.get("/")'],
+      calls: [{ method: 'GET', path: '/', expectStatus: 200, expectBody: { hello: 'world' } }],
+      codeContains: ['@app.get("/")', 'return'],
     },
     startDialog: [
       {
@@ -141,7 +141,7 @@ app = FastAPI(title="Hello API")
 def list_items():
     return {"items": []}
 
-# TODO: Add POST /items with status_code=201
+# TODO: Define @app.post("/items", status_code=201) with def create_item() returning {"id": 1, "name": "widget"}
 `,
     solutionCode: `from fastapi import FastAPI
 
@@ -160,7 +160,8 @@ def create_item():
         { method: 'GET', path: '/items' },
         { method: 'POST', path: '/items', status: 201 },
       ],
-      calls: [{ method: 'POST', path: '/items', expectStatus: 201 }],
+      calls: [{ method: 'POST', path: '/items', expectStatus: 201, expectBody: { id: 1, name: 'widget' } }],
+      codeContains: ['@app.post("/items", status_code=201)', 'return'],
     },
     startDialog: [
       {
@@ -240,8 +241,9 @@ def get_user(user_id: int):
         { method: 'GET', path: '/users/{user_id}' },
       ],
       calls: [
-        { method: 'GET', path: '/users/42', expectStatus: 200, expectBody: { id: 42 } },
+        { method: 'GET', path: '/users/42', expectStatus: 200, expectBody: { id: 42, name: 'ada' } },
       ],
+      codeContains: ['@app.get("/users/{user_id}")', 'return'],
     },
     startDialog: [
       {
@@ -319,6 +321,7 @@ def search(q: str = "", limit: int = 10):
           expectBody: { q: 'ada', limit: 2 },
         },
       ],
+      codeContains: ['return'],
     },
     startDialog: [
       {
@@ -398,7 +401,7 @@ def create_user(user: User):
           expectBody: { name: 'ada' },
         },
       ],
-      codeContains: ['class User(BaseModel):'],
+      codeContains: ['class User(BaseModel):', 'return'],
       openapiHas: ['components.schemas.User'],
     },
     startDialog: [
@@ -475,6 +478,7 @@ def delete_note(note_id: int):
         { method: 'DELETE', path: '/notes/{note_id}', status: 204 },
       ],
       calls: [{ method: 'DELETE', path: '/notes/7', expectStatus: 204 }],
+      codeContains: ['@app.delete("/notes/{note_id}", status_code=204)', 'return'],
     },
     startDialog: [
       {
@@ -568,11 +572,12 @@ def delete_note(note_id: int):
         { method: 'DELETE', path: '/notes/{note_id}', status: 204 },
       ],
       calls: [
-        { method: 'POST', path: '/notes', expectStatus: 201 },
-        { method: 'GET', path: '/notes/3', expectStatus: 200, expectBody: { id: 3 } },
-        { method: 'PUT', path: '/notes/3', expectStatus: 200 },
+        { method: 'POST', path: '/notes', expectStatus: 201, expectBody: { id: 1, title: 'hello' } },
+        { method: 'GET', path: '/notes/3', expectStatus: 200, expectBody: { id: 3, title: 'hello' } },
+        { method: 'PUT', path: '/notes/3', expectStatus: 200, expectBody: { id: 3, title: 'updated' } },
         { method: 'DELETE', path: '/notes/3', expectStatus: 204 },
       ],
+      codeContains: ['@app.post("/notes", status_code=201)', '@app.put("/notes/{note_id}")', '@app.delete("/notes/{note_id}", status_code=204)'],
     },
     startDialog: [
       {
@@ -719,7 +724,7 @@ def info(settings: dict = Depends(get_settings)):
     goal: {
       endpoints: [{ method: 'GET', path: '/info' }],
       calls: [{ method: 'GET', path: '/info', expectStatus: 200, expectBody: { app: 'LearnAPI' } }],
-      codeContains: ['Depends(get_settings)'],
+      codeContains: ['Depends(get_settings)', 'return'],
     },
     startDialog: [
       {
@@ -795,11 +800,11 @@ def admin(api_key: str = Header(...)):
         { method: 'GET', path: '/admin' },
       ],
       calls: [
-        { method: 'GET', path: '/public', expectStatus: 200 },
+        { method: 'GET', path: '/public', expectStatus: 200, expectBody: { ok: true } },
         { method: 'GET', path: '/admin', expectStatus: 401 },
         { method: 'GET', path: '/admin', headers: { 'api-key': 'secret' }, expectStatus: 200, expectBody: { who: 'admin' } },
       ],
-      codeContains: ['Header(...)'],
+      codeContains: ['Header(...)', 'return'],
       openapiHas: ['components.securitySchemes.apiKeyAuth'],
     },
     startDialog: [
@@ -877,7 +882,10 @@ def get_user(user_id: int):
 `,
     goal: {
       endpoints: [{ method: 'GET', path: '/users/{user_id}' }],
-      codeContains: ['response_model=UserOut'],
+      calls: [
+        { method: 'GET', path: '/users/42', expectStatus: 200, expectBody: { id: 42, name: 'ada' } },
+      ],
+      codeContains: ['response_model=UserOut', 'return'],
       openapiHas: ['components.schemas.UserOut', 'paths./users/{user_id}.get.responses'],
     },
     startDialog: [
@@ -1181,6 +1189,7 @@ def create_pet():
         { method: 'GET', path: '/pets' },
         { method: 'POST', path: '/pets', status: 201 },
       ],
+      codeContains: ['tags=["pets"]', 'summary='],
       openapiHas: ['paths./pets.get', 'paths./pets.post', 'info.title'],
     },
     startDialog: [
@@ -1250,7 +1259,7 @@ def create_item(item: Item):
 `,
     goal: {
       endpoints: [{ method: 'POST', path: '/items', status: 201 }],
-      codeContains: ['class Item(BaseModel):'],
+      codeContains: ['class Item(BaseModel):', 'return'],
       openapiHas: ['components.schemas.Item', 'paths./items.post.requestBody'],
     },
     startDialog: [
@@ -1329,6 +1338,7 @@ def metrics():
         { method: 'GET', path: '/health', expectStatus: 200, expectBody: { status: 'ok' } },
         { method: 'GET', path: '/metrics', expectStatus: 200, expectBody: { status: 'ok' } },
       ],
+      codeContains: ['@app.get("/health")', '@app.get("/metrics")', 'return'],
     },
     startDialog: [
       {
@@ -1402,6 +1412,7 @@ function() {
         { method: 'GET', path: '/health', expectStatus: 200, expectBody: { status: 'ok' } },
         { method: 'GET', path: '/metrics', expectStatus: 200, expectBody: { status: 'ok' } },
       ],
+      codeContains: ['#* @get /health', '#* @get /metrics'],
     },
     startDialog: [
       {

@@ -181,3 +181,102 @@ export function nextAction(items, ctx) {
 
   return { type: 'edit', item: first };
 }
+
+/**
+ * Extract complete handler snippet (decorator, def, body, return) from solutionCode.
+ * @param {string} source
+ * @param {string} label E.g. "GET /" or "POST /items"
+ * @param {string} [language='python']
+ * @returns {string}
+ */
+export function extractHandlerSnippet(source, label, language = 'python') {
+  if (!source) return '';
+  const parts = label.split(' ');
+  const method = (parts[0] || 'GET').toLowerCase();
+  const path = parts[1] || '/';
+
+  if (language === 'r') {
+    const escaped = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\{(\w+)\\\}/g, '(?:<\\w+>|\\{$1\\})');
+    const re = new RegExp(`((?:^\\s*#\\*[^\\n]*\\n)*^\\s*#\\*\\s*@${method}\\s+${escaped}[^\\n]*\\n(?:^\\s*#\\*[^\\n]*\\n)*^\\s*(?:async\\s+)?function\\s*\\([^)]*\\)\\s*\\{[\\s\\S]*?\\n\\})`, 'm');
+    const m = source.match(re);
+    if (m) return m[1].trim();
+  } else {
+    const escaped = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`(@app\\.${method}\\s*\\(\\s*['"]${escaped}['"][^)]*\\)[\\s\\S]*?(?:\\n\\s*(?:async\\s+)?def\\s+\\w+\\s*\\([^)]*\\)[^:]*:[\\s\\S]*?)(?=\\n(?:@|def\\s|class\\s|$)))`, 'm');
+    const m = source.match(re);
+    if (m) return m[1].trim();
+  }
+  return '';
+}
+
+/**
+ * Extract complete block snippet for a code label from solutionCode.
+ * @param {string} source
+ * @param {string} label E.g. "class User(BaseModel):" or "Depends(get_settings)"
+ * @returns {string}
+ */
+export function extractCodeSnippet(source, label) {
+  if (!source) return label;
+  if (/^class\s+\w+/.test(label)) {
+    const className = (label.match(/^class\s+(\w+)/) || [])[1];
+    if (className) {
+      const re = new RegExp(`(class\\s+${className}[\\s\\S]*?)(?=\\n(?:@|class\\s|def\\s|$))`, 'm');
+      const m = source.match(re);
+      if (m) return m[1].trim();
+    }
+  }
+  if (label.includes('Depends(') || label.includes('Header(') || label.includes('response_model=')) {
+    const lines = source.split('\n');
+    let startIdx = -1;
+    let endIdx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes(label) || (label.includes('Header') && lines[i].includes('Header('))) {
+        startIdx = i;
+        while (startIdx > 0 && lines[startIdx - 1].trim().startsWith('@app.')) {
+          startIdx--;
+        }
+        endIdx = i;
+        while (endIdx + 1 < lines.length && (lines[endIdx + 1].startsWith(' ') || lines[endIdx + 1].startsWith('\t') || lines[endIdx + 1].trim() === '')) {
+          endIdx++;
+        }
+        break;
+      }
+    }
+    if (startIdx !== -1) {
+      return lines.slice(startIdx, endIdx + 1).join('\n').trim();
+    }
+  }
+  if (label.includes('raise HTTPException')) {
+    const lines = source.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes('HTTPException')) {
+        let s = i;
+        if (i > 0 && lines[i - 1].trim().startsWith('if ')) s = i - 1;
+        return lines.slice(s, i + 1).join('\n').trim();
+      }
+    }
+  }
+  return label;
+}
+
+/**
+ * Format a complete code snippet instruction for the code editor based on current level and language.
+ *
+ * @param {GoalItem} item
+ * @param {object} level
+ * @returns {string}
+ */
+export function editorSnippetForGoal(item, level) {
+  if (!level) return item.label;
+  if (item.kind === 'endpoint') {
+    const s = extractHandlerSnippet(level.solutionCode, item.label, level.language);
+    if (s) return s;
+    if (level.pattern) return level.pattern;
+  }
+  if (item.kind === 'code') {
+    const s = extractCodeSnippet(level.solutionCode, item.label);
+    if (s) return s;
+    return item.label;
+  }
+  return item.label;
+}

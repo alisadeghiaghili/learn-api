@@ -508,17 +508,19 @@ export function parsePython(source) {
     const args = rm[4] || '';
     const after = source.slice(rm.index + rm[0].length);
     const defHead = after.match(/^\s*(?:async\s+)?def\s+(\w+)\s*\(/);
-    const handlerName = defHead ? defHead[1] : 'handler';
+    if (!defHead) {
+      app.errors.push(`@app.${rm[1]}("${rm[3]}") requires a def handler function.`);
+      continue;
+    }
+    const handlerName = defHead[1];
     let paramsRaw = '';
     let bodyRaw = '';
-    if (defHead) {
-      const parenStart = after.indexOf('(', defHead.index + defHead[0].length - 1);
-      const paramsBlock = extractBalanced(after, parenStart, '(', ')');
-      paramsRaw = paramsBlock.slice(1, -1);
-      const afterParams = after.slice(parenStart + paramsBlock.length);
-      const bodyM = afterParams.match(/^\s*(?:->\s*[^:]+)?\s*:\n([\s\S]*?)(?=\n@|\ndef\s|\nasync\s|\nclass\s|$)/);
-      bodyRaw = bodyM ? bodyM[1] : '';
-    }
+    const parenStart = after.indexOf('(', defHead.index + defHead[0].length - 1);
+    const paramsBlock = extractBalanced(after, parenStart, '(', ')');
+    paramsRaw = paramsBlock.slice(1, -1);
+    const afterParams = after.slice(parenStart + paramsBlock.length);
+    const bodyM = afterParams.match(/^\s*(?:->\s*[^:]+)?\s*:\n([\s\S]*?)(?=\n@|\ndef\s|\nasync\s|\nclass\s|$)/);
+    bodyRaw = bodyM ? bodyM[1] : '';
 
     /** @type {Record<string, string>} */
     const pathParams = {};
