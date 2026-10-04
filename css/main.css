@@ -358,6 +358,21 @@ button.ghost {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  direction: ltr;
+}
+
+.viz-panel svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-width: 540px;
+  direction: ltr;
+}
+
+.viz-panel svg text,
+.viz-panel svg tspan {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 .viz-panel[hidden] {
@@ -454,7 +469,7 @@ button.ghost {
 .term-log .fail { color: var(--err); }
 .term-log .warn { color: var(--warn); }
 .term-log .str { color: #f9a8d4; }
-.term-log .welcome { color: #818cf8; font-weight: 600; }
+.term-log .welcome { color: #ffffff; font-weight: 600; }
 
 .term-hint {
   padding: 6px 14px;
@@ -1382,8 +1397,13 @@ html[dir="rtl"] code,
 html[dir="rtl"] .goal-list .g-label,
 html[dir="rtl"] .goal-list code,
 html[dir="rtl"] .g-cmd,
-html[dir="rtl"] .level-title {
-  direction: ltr;
+html[dir="rtl"] .level-title,
+html[dir="rtl"] .viz-wrap,
+html[dir="rtl"] .viz-panel,
+html[dir="rtl"] .viz-panel svg,
+html[dir="rtl"] .viz-panel svg text,
+html[dir="rtl"] .viz-panel svg tspan {
+  direction: ltr !important;
   text-align: left;
 }
 

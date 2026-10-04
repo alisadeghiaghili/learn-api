@@ -49,13 +49,15 @@ export function createPipelineViz(container) {
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
     svg.setAttribute('role', 'img');
     svg.setAttribute('aria-label', 'Request pipeline visualization');
+    svg.setAttribute('dir', 'ltr');
+    svg.style.direction = 'ltr';
     svg.innerHTML = `
       <defs>
         <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
           <path d="M 0 0 L 10 5 L 0 10 z" fill="${TRACK_COLORS.line}" />
         </marker>
       </defs>
-      <text class="viz-muted" x="24" y="28">client → router → handler → response</text>
+      <text class="viz-muted" x="24" y="28" text-anchor="start" direction="ltr">client → router → handler → response</text>
     `;
 
     const stages = [
@@ -132,7 +134,14 @@ export function createPipelineViz(container) {
     // Route inventory strip
     const listY = 210;
     svg.appendChild(
-      el('text', { x: 24, y: listY - 8, class: 'viz-muted', textContent: `${routes.length} routes` })
+      el('text', {
+        x: 24,
+        y: listY - 8,
+        class: 'viz-muted',
+        'text-anchor': 'start',
+        direction: 'ltr',
+        textContent: `${routes.length} routes`,
+      })
     );
     let lx = 24;
     for (const r of routes.slice(0, 8)) {
@@ -264,8 +273,10 @@ export function createSurfaceViz(container) {
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
     svg.setAttribute('role', 'img');
     svg.setAttribute('aria-label', 'API surface map');
+    svg.setAttribute('dir', 'ltr');
+    svg.style.direction = 'ltr';
 
-    const title = el('text', { x: 24, y: 28, class: 'viz-muted' });
+    const title = el('text', { x: 24, y: 28, class: 'viz-muted', 'text-anchor': 'start', direction: 'ltr' });
     title.textContent = state.title ? `${state.title} · open surface` : 'API surface';
     svg.appendChild(title);
 
@@ -297,6 +308,8 @@ export function createSurfaceViz(container) {
         x: 40,
         y: 120,
         class: 'viz-muted',
+        'text-anchor': 'start',
+        direction: 'ltr',
       });
       empty.textContent = 'No routes yet — write handlers and press Run.';
       svg.appendChild(empty);
