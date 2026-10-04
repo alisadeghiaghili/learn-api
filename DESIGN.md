@@ -1,85 +1,89 @@
-# LearnAPI — Design Spec
+# LearnAPI — System Architecture & Design Specification
 
-Interactive API development tutorial game in the mold of learnGitBranching.
-Covers **FastAPI (Python)**, **plumber (R)**, and **OpenAPI / Swagger**.
+LearnAPI is an interactive, browser-based tutorial and simulation laboratory for modern backend API development using **FastAPI (Python)**, **plumber (R)**, and **OpenAPI 3.0**.
 
-## Style anchor
+---
 
-Packet-capture workstation chrome crossed with LGB’s game tutorial overlay.
-Reference: Wireshark dark density + FastAPI docs clarity + LGB modal levels.
-Not a SaaS marketing page. Not a codepen demo.
+## 1. Architectural Principles
 
-## Palette
+1. **Deterministic Client-Side Simulation**:
+   No backend server, Docker container, or WebAssembly sandbox is required. The engine implements a lightweight static code parser, tokenizer, micro-evaluator, and mock HTTP request router directly in vanilla ES modules.
+
+2. **Clean Separation of Concerns**:
+   - `engine.js`: Pure AST-like parsing, parameter coercion, route matching, and mock request execution.
+   - `game.js`: Pure game domain rules, goal evaluation, and next-action recommendation. Completely detached from DOM manipulation.
+   - `app.js`: View controller, UI layout orchestration, event routing, and modal lifecycles.
+   - `terminal.js` & `dialog.js`: Presentational UI components.
+
+3. **High Pedagogical Rigor (Depth >= 8.5/10)**:
+   Every lesson teaches production-grade concepts: idempotency, REST semantics, validation errors (422), dependency injection, API key security, and schema documentation. Each level provides three core theoretical concepts and three field-tested production notes.
+
+4. **Bi-directional Internationalization**:
+   Full support for both English (LTR) and Persian (RTL). All instructional copy, modals, goals, field notes, and hints are localized, while commands and code tokens remain standard English.
+
+---
+
+## 2. Visual System & Design Tokens
+
+### Color Palette
 
 | Token | Hex | Role |
 |-------|-----|------|
-| `bg` | `#0A0F1A` | App background (deep capture navy) |
-| `panel` | `#111827` | Panels, editors |
-| `line` | `#1F2A3C` | Borders, grid |
-| `ink` | `#E8EDF5` | Primary text |
-| `muted` | `#8B9BB4` | Secondary text |
-| `fastapi` | `#009485` | FastAPI track / method pills |
-| `plumber` | `#276DC3` | plumber / R track |
-| `openapi` | `#85CB33` | OpenAPI / Swagger track |
-| `packet` | `#7C6AF7` | Live request packet |
-| `ok` | `#2DD4A8` | 2xx |
-| `fail` | `#F07178` | 4xx/5xx |
+| `--ink` | `#0A0F1A` | Dark foundation / terminal canvas background |
+| `--panel` | `#111827` | Primary surface panel background |
+| `--panel-2` | `#182234` | Secondary surface / elevated elements |
+| `--line` | `#1F2A3C` | Structural border and grid dividers |
+| `--text` | `#E8EDF5` | Primary body typography |
+| `--haze` | `#8B9BB4` | Muted labels, secondary descriptions |
+| `--accent` | `#009485` | LearnAPI primary accent (Teal) |
+| `--api-logo` | `#7C6AF7` | Violet wordmark branding for `API` |
+| `--remote` | `#F59E0B` | Production field notes (Amber) |
+| `--hint-orange` | `#FF8C1A` | Active checklist item glow and terminal hinter |
+| `--code` | `#60A5FA` | Terminal commands and code references |
+| `--ok` | `#2DD4A8` | Successful operations and 2xx statuses |
+| `--warn` | `#F5C542` | Warnings and 3xx/4xx informational states |
+| `--err` | `#F07178` | Validation errors and failure states |
+| `--packet` | `#7C6AF7` | Request packet animation color |
 
-## Typography
+### Typography
 
-- UI: `Segoe UI Variable Text`, `Segoe UI`, `system-ui`, sans-serif
-- Mono: `Cascadia Code`, `Cascadia Mono`, `Consolas`, `ui-monospace`, monospace
-- Scale: 11 / 12 / 14 / 17 / 22 / 32 / 48
-- Method badges: mono 700, track-colored, never decorative caps eyebrows
+- **Interface**: `'Segoe UI Variable Text'`, `'Segoe UI'`, `system-ui`, `-apple-system`, sans-serif
+- **Code & Shell**: `'Cascadia Code'`, `Consolas`, `ui-monospace`, monospace
 
-## Layout
+---
+
+## 3. Workstation Layout
+
+The interface is structured as a two-column responsive grid:
 
 ```
-┌─ chrome: LearnAPI · track · levels · golf · undo / reset ────┐
-├─ level dialog (LGB-style modal / left rail)                  │
-├──────────────┬──────────────────────────┬────────────────────┤
-│ sequences /  │  pipeline visualization  │ OpenAPI map        │
-│ level list   │  Client → Router →       │ (path tree)        │
-│              │  Handler → Response      │                    │
-├──────────────┴──────────────────────────┴────────────────────┤
-│ code editor (FastAPI / plumber)     │ command console        │
-└─────────────────────────────────────┴────────────────────────┘
+┌──────────────────────────────────────────────────────────┬──────────────────────────┐
+│ Toolbar: LearnAPI · Level Title · Controls · Lang · Links │                          │
+├────────────────────────────┬─────────────────────────────┤ Always-On Learning Guide │
+│ Visualizer Panel           │ Code Editor                 │ Dock                     │
+│  - Pipeline (Client/Server)│  - server.py / server.R     │  - Objective             │
+│  - API Surface Graph       │  - Run Action (Ctrl+Enter)  │  - Concepts              │
+│  - Live OpenAPI Schema     │                             │  - Field Notes           │
+├────────────────────────────┴─────────────────────────────┤  - Interactive Checklist │
+│ Interactive Terminal (Command input, tab completion)     │  - Next Action Card      │
+└──────────────────────────────────────────────────────────┴──────────────────────────┘
 ```
 
-Grid rhythm: 8px base. Panel padding 12–16. Dense chrome, airy dialogs.
+---
 
-## Signature moments
+## 4. Execution & Evaluation Flow
 
-1. **Packet flight** — a violet packet carries `GET /users` through
-   Client → Router → Handler → Response; status badge snaps on arrival.
-2. **Surface bloom** — `run` compiles code; endpoint nodes bloom into the
-   OpenAPI map with track-colored method pills (LGB’s tree growth).
+1. **Compilation Phase**:
+   - Learner inputs framework code and clicks **Run** (or presses `Ctrl+Enter`).
+   - `engine.js` parses routes, decorators, parameter annotations, and schemas.
+   - Live visualizers render the updated pipeline nodes and OpenAPI documentation.
 
-## Principles
+2. **Testing Phase**:
+   - Learner dispatches HTTP calls in the terminal (`call GET /users/1`).
+   - `engine.js` matches route paths, verifies parameter types, resolves dependencies, and executes handlers.
+   - The packet flight animation traces the request from Client to Router to Handler to Response.
 
-- Method/track colors are identity, not decoration.
-- One motion system only (packet flight + endpoint birth).
-- Code is the hero; chrome stays quiet.
-- Levels are JSON (start code / goal / dialog / solution / golf par).
-- 100% client-side: parsers + mock runtime, no backend.
-
-## Level model
-
-```js
-{
-  id, track, language, name, hint, golf,
-  startCode, solutionCode,
-  goal: { endpoints?, calls?, codeContains?, openapiHas? },
-  startDialog: [{ type: 'ModalAlert' | 'ApiDemo', ... }]
-}
-```
-
-Tracks: `http` · `fastapi` · `plumber` · `openapi` · `compare`.
-
-## Interaction loop (mirrors LGB)
-
-1. Dialog teaches the idea (ModalAlert + live ApiDemo).
-2. Learner edits code / console commands.
-3. Visualization and OpenAPI map update live on `run`.
-4. Win when goal endpoints and sample calls match.
-5. `levels`, `hint`, `undo`, `reset`, `solution`, golf score.
+3. **Checklist Validation & Golfing**:
+   - `game.js` compares the parsed server and executed requests against level goals.
+   - When all checklist items are met, celebration fanfare and confetti are triggered.
+   - Player command count is scored against the ideal par target.
