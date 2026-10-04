@@ -15,7 +15,7 @@ import { TerminalView } from './terminal.js';
 import { launchConfetti, playFanfare } from './confetti.js';
 import { initLocale, getLocale, setLocale, LOCALES, ui } from './i18n/index.js';
 import { loadProgress, saveProgress, summarize } from './progress.js';
-import { buildShareTargets, share, REPO_URL, COFFEE_URL } from './share.js';
+import { buildShareTargets, share, REPO_URL, COFFEE_URL, COFFEE_BUTTON_HTML } from './share.js';
 import { getVisitorCount } from './visitor.js';
 
 /** @typedef {import('./levels.js').Level} Level */
@@ -641,9 +641,33 @@ class App {
   showWelcome() {
     const u = ui();
     showModal({
-      title: 'welcome to learn api',
+      title: u.welcomeTitle,
       titleHtml: u.welcomeTitleHtml,
-      bodyHtml: u.welcomeBody.map((p) => `<p>${renderMarkdown(p).replace(/^<p>|<\/p>$/g, '')}</p>`).join(''),
+      bodyHtml: renderMarkdown(
+        [
+          u.welcomeIntro,
+          '',
+          u.welcomeBoard,
+          '',
+          u.welcomeTracks,
+          '',
+          u.welcomeMeta,
+          '',
+          u.welcomeLevelsCount(LEVELS.length),
+          '',
+          u.welcomeWhat,
+          u.welcomeWhatBody,
+          '',
+          u.welcomePublisher,
+          u.welcomePublisherBody,
+          '',
+          u.welcomeGithub,
+          '',
+          u.welcomeCoffee,
+          '',
+          COFFEE_BUTTON_HTML,
+        ].join('\n'),
+      ),
       closeLabel: u.closeBtn,
       actions: [
         { label: u.welcomeSandbox, className: 'ghost', onClick: () => this.term.focus() },

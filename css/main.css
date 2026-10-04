@@ -8,7 +8,7 @@
   --haze: #8B9BB4;
   --text: #E8EDF5;
   --accent: #009485;
-  --api-logo: #7C6AF7;
+  --api-logo: #86CDC6;
   --remote: #F59E0B;
   --hint-orange: #ff8c1a;
   --code: #60a5fa;
@@ -862,6 +862,10 @@ button.ghost {
   margin: 0 0 12px;
   font-size: 18px;
   color: var(--text);
+}
+
+.modal h2 span {
+  color: var(--api-logo);
 }
 
 .modal .markdown {

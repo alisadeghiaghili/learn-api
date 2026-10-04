@@ -22,9 +22,27 @@ export function escapeHtml(s) {
  * @returns {string}
  */
 export function renderInline(raw) {
-  return escapeHtml(raw)
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // Keep trusted <a>…</a> HTML (Buy Me a Coffee button, links) as real markup.
+  const slots = [];
+  const parts = raw.split(/(<a\b[\s\S]*?<\/a>)/gi);
+  const mapped = parts
+    .map((part, i) => {
+      if (i % 2 === 1) {
+        slots.push(part);
+        return '@@HTML' + (slots.length - 1) + '@@';
+      }
+      let t = escapeHtml(part);
+      t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
+      t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      t = t.replace(
+        /\[([^\]]+)\]\(([^)\s]+)\)/g,
+        (_m, label, href) =>
+          `<a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a>`,
+      );
+      return t;
+    })
+    .join('');
+  return mapped.replace(/@@HTML(\d+)@@/g, (_m, i) => slots[Number(i)] ?? '');
 }
 
 /**

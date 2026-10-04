@@ -167,12 +167,22 @@ export const fa = {
     goalsFooter: (par) => `ایده‌آل ${par} فرمان · \`hint\` · \`solution\``,
 
     // welcome
-    welcomeTitleHtml: 'welcome to learn <span class="logo-api">api</span>',
-    welcomeBody: [
-      'LearnAPI یک آزمایشگاه عملی برای ساخت APIهای وب با **FastAPI**، **plumber** و **OpenAPI** است.',
-      'کد فریم‌ورک را می‌نویسید، با **Run** در یک سرور شبیه‌ساز کامپایل می‌کنید، بعد از کنسول اندپوینت‌ها را صدا می‌زنید و مسیر درخواست را می‌بینید.',
-      'هر مرحله یک ایده‌ی کاربردی تولید را آموزش می‌دهد، همراه با یادداشت‌های میدانی از سرویس‌های واقعی.',
-    ],
+    welcomeTitle: 'welcome to learn api',
+    welcomeTitleHtml: 'welcome to learn <span class="logo-api">API</span>',
+    welcomeIntro: 'آموزش تعاملی **APIهای وب** — سندباکس + مراحل هدایت‌شده‌ی عملیاتی.',
+    welcomeBoard: 'ویژوالایزر مسیر **Client → Router → Handler → Response** را نشان می‌دهد. این چرخه‌ی پایپ‌لاینی است که LearnAPI شبیه‌سازی می‌کند.',
+    welcomeTracks:
+      '- مبانی: متدهای HTTP، کدهای وضعیت، پارامترهای مسیر و کوئری\n- فست‌وب (FastAPI): اسکیمای Pydantic، اعتبارسنجی، تزریق وابستگی\n- پلامبر (Plumber R): مسیریابی، فیلترها، دکوراتورهای اندپوینت\n- OpenAPI: قرارداد داده، اسکیمای استاندارد، مستندسازی تعاملی\n- معماری مقایسه‌ای: الگوهای تولیدی پایتون در برابر R',
+    welcomeMeta: 'متا: `levels`, `run`, `call`, `openapi`, `hint`, `solution`, `undo`, `reset`.',
+    welcomeLevelsCount: (n) => `**${n}** مرحله گنجانده شده. برای شروع مرحله‌ها را باز کنید، یا در سندباکس بمانید.`,
+    welcomeWhat: '**LearnAPI چیست؟**',
+    welcomeWhatBody:
+      'یک آزمایشگاه مرورگری برای APIهای وب: کدهای واقعی FastAPI و Plumber را می‌نویسید، در یک موتور شبیه‌ساز درون‌حافظه کامپایل می‌کنید، فراخوانی‌های واقعی HTTP می‌فرستید و ردگیری پایپ‌لاین و مشخصات OpenAPI را در لحظه مشاهده می‌کنید؛ بدون نیاز به نصب هیچ سرور محلی.',
+    welcomePublisher: '**ناشر**',
+    welcomePublisherBody:
+      'انتشار و نگهداری توسط **Ali Sadeghi Aghili** — برنامه‌نویس، مهندس/دانشمند داده، مهندس ML. [linktr.ee/aliaghili](https://linktr.ee/aliaghili)',
+    welcomeGithub: '- [GitHub — سورس و ایشو](https://github.com/alisadeghiaghili/learn-api)',
+    welcomeCoffee: 'Buy Me a Coffee (از ناشر حمایت می‌کند):',
     welcomeLevels: 'مرور مرحله‌ها',
     welcomeFirst: 'شروع مرحله‌ی ۱',
     welcomeSandbox: 'باز کردن سندباکس',

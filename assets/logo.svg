@@ -5,7 +5,7 @@
       <stop offset="100%" stop-color="#0A0F1A"/>
     </linearGradient>
     <linearGradient id="pulse" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#7C6AF7"/>
+      <stop offset="0%" stop-color="#86CDC6"/>
       <stop offset="100%" stop-color="#009485"/>
     </linearGradient>
   </defs>
@@ -13,14 +13,14 @@
   <rect width="64" height="64" rx="14" fill="url(#bg)"/>
   <rect x="1" y="1" width="62" height="62" rx="13" fill="none" stroke="#1F2A3C" stroke-width="2"/>
   <circle cx="16" cy="32" r="5" fill="none" stroke="#8B9BB4" stroke-width="2"/>
-  <circle cx="32" cy="32" r="5" fill="none" stroke="#7C6AF7" stroke-width="2"/>
+  <circle cx="32" cy="32" r="5" fill="none" stroke="#86CDC6" stroke-width="2"/>
   <circle cx="48" cy="32" r="5" fill="#2DD4A8"/>
   <path d="M21 32 H27" stroke="url(#pulse)" stroke-width="2.5" stroke-linecap="round"/>
   <path d="M37 32 H43" stroke="url(#pulse)" stroke-width="2.5" stroke-linecap="round"/>
-  <circle cx="32" cy="20" r="3.5" fill="#7C6AF7"/>
-  <path d="M32 24 V27" stroke="#7C6AF7" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+  <circle cx="32" cy="20" r="3.5" fill="#86CDC6"/>
+  <path d="M32 24 V27" stroke="#86CDC6" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
   <path d="M22 44 H42" stroke="#009485" stroke-width="2" stroke-linecap="round" opacity="0.85"/>
   <!-- wordmark -->
   <text x="80" y="38" font-family="Segoe UI, system-ui, sans-serif" font-size="28" font-weight="650" fill="#E8EDF5" letter-spacing="-0.5">Learn</text>
-  <text x="156" y="38" font-family="Segoe UI, system-ui, sans-serif" font-size="28" font-weight="650" fill="#7C6AF7" letter-spacing="-0.5">API</text>
+  <text x="156" y="38" font-family="Segoe UI, system-ui, sans-serif" font-size="28" font-weight="650" fill="#86CDC6" letter-spacing="-0.5">API</text>
 </svg>

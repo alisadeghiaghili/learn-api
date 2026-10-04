@@ -143,3 +143,19 @@ def create_user(user: UserIn):
   assert.equal(spec.components.schemas.UserIn.properties.name.type, 'string');
   assert.equal(spec.components.schemas.UserIn.properties.age.type, 'integer');
 });
+
+test('robustness: renderMarkdown handles links and trusted anchor tags', async () => {
+  const { renderMarkdown } = await import('../js/dialog.js');
+  const { COFFEE_BUTTON_HTML } = await import('../js/share.js');
+
+  const raw = `
+Check out [profile](https://linktr.ee/aliaghili).
+
+${COFFEE_BUTTON_HTML}
+`;
+  const rendered = renderMarkdown(raw);
+  assert.ok(rendered.includes('<a href="https://linktr.ee/aliaghili" target="_blank" rel="noopener noreferrer">profile</a>'));
+  assert.ok(rendered.includes('https://img.buymeacoffee.com/button-api/'));
+  assert.ok(!rendered.includes('&lt;a href='), 'trusted a tags should not be escaped');
+});
+

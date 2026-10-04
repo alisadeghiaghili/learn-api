@@ -167,12 +167,22 @@ export const en = {
     goalsFooter: (par) => `ideal ${par} commands · \`hint\` · \`solution\``,
 
     // welcome
-    welcomeTitleHtml: 'welcome to learn <span class="logo-api">api</span>',
-    welcomeBody: [
-      'LearnAPI is a hands-on lab for building web APIs with **FastAPI**, **plumber** and **OpenAPI**.',
-      'You write framework code, press **Run** to compile it into a mock server, then call endpoints from the console and watch the request pipeline.',
-      'Every level teaches one production idea, with field notes from real services.',
-    ],
+    welcomeTitle: 'welcome to learn api',
+    welcomeTitleHtml: 'welcome to learn <span class="logo-api">API</span>',
+    welcomeIntro: 'Interactive **Web API** tutorial — sandbox + guided production levels.',
+    welcomeBoard: 'The visualizer inspects **Client → Router → Handler → Response**. That is the request pipeline LearnAPI simulates.',
+    welcomeTracks:
+      '- Basics: HTTP methods, status codes, query & path parameters\n- FastAPI (Python): Pydantic schemas, validation, dependencies\n- Plumber (R): routing, filters, endpoint decorators\n- OpenAPI: contract-first schemas, interactive docs\n- Comparative Architecture: Python vs R production patterns',
+    welcomeMeta: 'Meta: `levels`, `run`, `call`, `openapi`, `hint`, `solution`, `undo`, `reset`.',
+    welcomeLevelsCount: (n) => `**${n}** levels included. Open Levels to begin, or stay in sandbox.`,
+    welcomeWhat: '**What is LearnAPI?**',
+    welcomeWhatBody:
+      'A browser lab bench for web APIs: you write real-world FastAPI and Plumber code, compile it into an in-memory mock engine, issue realistic HTTP requests, and watch the pipeline trace and OpenAPI schemas update instantly. No local server install required.',
+    welcomePublisher: '**Publisher**',
+    welcomePublisherBody:
+      'Published and maintained by **Ali Sadeghi Aghili** — programmer, data engineer / scientist, ML engineer. [linktr.ee/aliaghili](https://linktr.ee/aliaghili)',
+    welcomeGithub: '- [GitHub — source & issues](https://github.com/alisadeghiaghili/learn-api)',
+    welcomeCoffee: 'Buy Me a Coffee (supports the publisher):',
     welcomeLevels: 'Browse levels',
     welcomeFirst: 'Start level 1',
     welcomeSandbox: 'Open sandbox',
