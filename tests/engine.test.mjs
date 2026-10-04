@@ -182,5 +182,26 @@ assert(authed.status === 200, `with key 200 (got ${authed.status})`);
 const advDoc = generateOpenAPI(adv);
 assert(openApiHas(advDoc, 'components.securitySchemes.apiKeyAuth'), 'securitySchemes');
 
+console.log('multiline statements & evaluation');
+const calcApp = parseSource(
+  `
+from fastapi import FastAPI
+
+app = FastAPI(title="Calc")
+
+@app.get("/calc")
+def calc(a: int = 2, b: int = 3):
+    total = a + b
+    msg = f"sum is {total}"
+    return {"sum": total, "msg": msg}
+`,
+  'python'
+);
+const calcRes = executeRequest(calcApp, { method: 'GET', path: '/calc?a=10&b=25' });
+assert(calcRes.status === 200, `calcRes 200 (got ${calcRes.status})`);
+assert(calcRes.body.sum === 35, `calcRes sum 35 (got ${calcRes.body.sum})`);
+assert(calcRes.body.msg === 'sum is 35', `calcRes msg (got ${calcRes.body.msg})`);
+
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

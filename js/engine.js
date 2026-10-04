@@ -1,14 +1,11 @@
 /**
  * LearnAPI engine — FastAPI (Python) and plumber (R) parsers plus a
- * mock HTTP runtime used by the tutorial game. Pure client-side; no
- * real Python or R is executed. Handlers are reduced to static returns
- * and simple parameter substitution so levels stay deterministic.
+ * deterministic mock HTTP runtime used by the tutorial simulator.
  *
- * Args:
- *   (module — import consumers only)
- *
- * Returns:
- *   (exports: createApp, parseSource, matchRoute, executeRequest, ...)
+ * Client-side execution model:
+ * Parses route declarations, Pydantic models, dependencies (Depends),
+ * header auth contracts, query/path parameters, and evaluates handler
+ * expressions with local variable scoping and type coercion.
  */
 
 /** @typedef {'GET'|'POST'|'PUT'|'PATCH'|'DELETE'} HttpMethod */
@@ -46,12 +43,11 @@
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
 /**
- * Normalize a route path to a canonical form (leading slash, no trailing slash).
- *
+ * Normalize a route path to canonical form (leading slash, no trailing slash).
  * @param {string} path
  * @returns {string}
  */
-function normalizePath(path) {
+export function normalizePath(path) {
   if (!path) return '/';
   let p = path.trim();
   if (!p.startsWith('/')) p = '/' + p;
@@ -61,26 +57,26 @@ function normalizePath(path) {
 
 /**
  * Convert OpenAPI-style `{id}` and plumber-style `<id>` path params to `{id}`.
- *
  * @param {string} path
  * @returns {string}
  */
-function normalizePathParams(path) {
-  return normalizePath(path).replace(/<([^>]+)>/g, '{$1}');
+export function normalizePathParams(path) {
+  return normalizePath(path).replace(/<([^:>]+)(?::[^>]+)?>/g, '{$1}');
 }
 
 /**
- * Extract a balanced-brace block starting at `start` (index of `{`).
- *
+ * Extract a balanced-delimiter block starting at `start`.
  * @param {string} src
  * @param {number} start
+ * @param {string} [open='{']
+ * @param {string} [close='}']
  * @returns {string}
  */
-function extractBraces(src, start) {
+export function extractBalanced(src, start, open = '{', close = '}') {
   let depth = 0;
   for (let i = start; i < src.length; i++) {
-    if (src[i] === '{') depth++;
-    else if (src[i] === '}') {
+    if (src[i] === open) depth++;
+    else if (src[i] === close) {
       depth--;
       if (depth === 0) return src.slice(start, i + 1);
     }
@@ -89,22 +85,21 @@ function extractBraces(src, start) {
 }
 
 /**
- * Parse a JSON-ish / Python-dict / R-list literal into a JS value.
- * Supports nested objects/arrays, strings, numbers, true/false/null, TRUE/FALSE/NULL.
- *
+ * Parse literals and dictionary/list templates into JavaScript values.
  * @param {string} text
  * @returns {unknown}
  */
-function parseLiteral(text) {
+export function parseLiteral(text) {
   const src = text.trim();
   if (!src) return null;
-  // Fast path: JSON
   try {
     return JSON.parse(src);
   } catch {
-    /* fall through */
+    /* fall through to normalization */
   }
+
   let normalized = src
+    .replace(/\bas\.(?:integer|numeric|character)\s*\(\s*([A-Za-z_][\w.$]*)\s*\)/g, '$1')
     .replace(/\bTrue\b/g, 'true')
     .replace(/\bFalse\b/g, 'false')
     .replace(/\bNone\b/g, 'null')
@@ -112,19 +107,18 @@ function parseLiteral(text) {
     .replace(/\bNA\b/g, 'null')
     .replace(/\bTRUE\b/g, 'true')
     .replace(/\bFALSE\b/g, 'false')
-    // settings["app_name"] → settings.app_name (bound via Deps)
+    // settings["app_name"] -> settings.app_name
     .replace(/([A-Za-z_][A-Za-z0-9_]*)\s*\[\s*['"]([^'"]+)['"]\s*\]/g, '$1.$2')
-    // single quotes → double
+    // single quotes -> double
     .replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (_, s) => JSON.stringify(s))
-    // Python/R keyword keys: name: / name = (also right after ( or [)
+    // keys name: or name =
     .replace(/([({[,\s])([A-Za-z_][A-Za-z0-9_]*)\s*:/g, '$1"$2":')
     .replace(/([({[,\s])([A-Za-z_][A-Za-z0-9_]*)\s*=/g, '$1"$2":')
-    // list(...) / dict(...) / c(...) wrappers appear as bare tokens — strip common ones
     .replace(/\blist\s*\(/g, '(')
     .replace(/\bdict\s*\(/g, '(')
     .replace(/\bc\s*\(/g, '(');
-  // Bare identifier values (path/query param names, attr reads) → strings so
-  // JSON parses; bindValue rewrites a string that equals a binding key.
+
+  // identifiers to quoted strings for JSON parsing
   normalized = normalized.replace(
     /:\s*([A-Za-z_][A-Za-z0-9_]*(?:[.$][A-Za-z_][A-Za-z0-9_]*)?)(\s*[,}\])])/g,
     (_, id, end) => {
@@ -132,18 +126,16 @@ function parseLiteral(text) {
       return `: ${JSON.stringify(id)}${end}`;
     }
   );
-  // R: list(a = 1, b = 2) already handled; empty list()
+
   normalized = normalized.replace(/\(\s*\)/g, '{}');
-  // R list() / parenthesized dict: `("a": 1)` without braces → `{"a": 1}`
-  // R list of values: `(1, 2, 3)` → `[1, 2, 3]`
+
   if (/^\(/.test(normalized) && !/^\(\s*[\{\[]/.test(normalized)) {
-    const inner = extractBracesOrParens(normalized, 0).slice(1, -1).trim();
+    const inner = extractBalanced(normalized, 0, '(', ')').slice(1, -1).trim();
     if (/:/.test(inner) && !/^[\d\s.,\-+"']*$/.test(inner)) {
       normalized = `{${inner}}`;
     } else if (inner === '') {
       normalized = '{}';
     } else if (/,/.test(inner) || /^[\d\s.\-+"']+$/.test(inner)) {
-      // array-like — quote bare words
       const items = splitTopLevel(inner).map((p) => p.trim()).filter(Boolean);
       const mapped = items.map((p) => {
         try {
@@ -155,29 +147,28 @@ function parseLiteral(text) {
       normalized = JSON.stringify(mapped);
     }
   }
-  // Unwrap outer parens used as object: ({...}) → {...} if content is object-like
+
   if (/^\(\s*\{/.test(normalized)) {
     normalized = normalized.replace(/^\(\s*/, '').replace(/\s*\)$/, '');
   }
   if (/^\(\s*\[/.test(normalized)) {
     normalized = normalized.replace(/^\(\s*/, '').replace(/\s*\)$/, '');
   }
+
   try {
     return JSON.parse(normalized);
   } catch {
-    /* ignore */
+    /* fallback to raw text */
   }
-  // Last resort: treat as string
   return src;
 }
 
 /**
- * Split on top-level commas (used for R list() → array).
- *
+ * Split on top-level commas.
  * @param {string} raw
  * @returns {string[]}
  */
-function splitTopLevel(raw) {
+export function splitTopLevel(raw) {
   const parts = [];
   let depth = 0;
   let cur = '';
@@ -196,34 +187,31 @@ function splitTopLevel(raw) {
 }
 
 /**
- * Pull `return <literal>` / bare `list(...)` as the handler payload template.
- *
+ * Extract return literal or R list from handler source.
  * @param {string} body
  * @returns {string}
  */
-function extractReturnLiteral(body) {
-  // Prefer the last Python `return <expr>`
-  const returns = [...body.matchAll(/\breturn\s+([\s\S]+)/g)];
+export function extractReturnLiteral(body) {
+  const cleaned = body.replace(/#.*$/gm, '').replace(/\/\/.*$/gm, '');
+  const returns = [...cleaned.matchAll(/\breturn\s+([\s\S]+)/g)];
   let expr = '';
   if (returns.length) {
     expr = returns[returns.length - 1][1];
   } else {
-    // plumber / R: last `list(...)` call
-    const lists = [...body.matchAll(/\blist\s*\(/g)];
+    const lists = [...cleaned.matchAll(/\blist\s*\(/g)];
     if (lists.length) {
       const start = lists[lists.length - 1].index + lists[lists.length - 1][0].length - 1;
-      expr = extractBracesOrParens(body, start);
+      expr = extractBalanced(cleaned, start, '(', ')');
     } else {
-      expr = body;
+      expr = cleaned;
     }
   }
+
   expr = expr
-    .replace(/#.*$/gm, '')
-    .replace(/\/\/.*$/gm, '')
     .replace(/;+\s*$/, '')
     .replace(/\s+/g, ' ')
     .trim();
-  // Cut trailing R/Python noise after the first complete top-level literal
+
   if (expr.startsWith('{') || expr.startsWith('(') || expr.startsWith('[')) {
     const open = expr[0];
     const close = open === '{' ? '}' : open === '(' ? ')' : ']';
@@ -243,34 +231,12 @@ function extractReturnLiteral(body) {
 }
 
 /**
- * Extract a balanced (...) block starting at `start` (index of `(`).
- *
- * @param {string} src
- * @param {number} start
- * @returns {string}
- */
-function extractBracesOrParens(src, start) {
-  const open = src[start];
-  const close = open === '(' ? ')' : open === '{' ? '}' : ']';
-  let depth = 0;
-  for (let i = start; i < src.length; i++) {
-    if (src[i] === open) depth++;
-    else if (src[i] === close) {
-      depth--;
-      if (depth === 0) return src.slice(start, i + 1);
-    }
-  }
-  return src.slice(start);
-}
-
-/**
- * Substitute `{id}`, bare names, and `user.name` attribute reads.
- *
+ * Substitute variables, f-strings, and attribute reads in an evaluated value.
  * @param {unknown} value
  * @param {Record<string, unknown>} bindings
  * @returns {unknown}
  */
-function bindValue(value, bindings) {
+export function bindValue(value, bindings) {
   if (typeof value === 'string') {
     const full = value.match(/^\{(\w+)\}$/);
     if (full && bindings[full[1]] !== undefined) {
@@ -279,7 +245,7 @@ function bindValue(value, bindings) {
     if (Object.prototype.hasOwnProperty.call(bindings, value)) {
       return bindings[value];
     }
-    // Pydantic-style `user.name` / R `body$name` / `settings.app_name` → bindings
+    // user.name or body$name or settings.app_name
     const attr = value.match(/^(\w+)[.$](\w+)$/);
     if (attr) {
       const key = `${attr[1]}.${attr[2]}`;
@@ -306,12 +272,175 @@ function bindValue(value, bindings) {
 }
 
 /**
- * Parse FastAPI-style Python source into routes and models.
+ * Coerce values into specified types.
+ * @param {unknown} raw
+ * @param {string} type
+ * @returns {unknown}
+ */
+export function coerce(raw, type) {
+  const t = (type || '').toLowerCase();
+  if (raw === undefined || raw === null || raw === '') return raw;
+  if (['int', 'integer', 'long'].includes(t)) {
+    const n = Number(raw);
+    return Number.isNaN(n) ? raw : Math.trunc(n);
+  }
+  if (['float', 'double', 'number', 'numeric'].includes(t)) {
+    const n = Number(raw);
+    return Number.isNaN(n) ? raw : n;
+  }
+  if (['bool', 'boolean'].includes(t)) {
+    if (raw === true || raw === 'true' || raw === 'True') return true;
+    if (raw === false || raw === 'false' || raw === 'False') return false;
+    return raw;
+  }
+  return raw;
+}
+
+/**
+ * Micro-evaluator for handler statements and expressions.
+ * Supports local variable assignments, simple math, string templates, and conditions.
  *
+ * @param {string} source
+ * @param {Record<string, unknown>} bindings
+ * @returns {{ bound: unknown, earlyReturn?: { status: number, detail: string } }}
+ */
+export function evaluateHandler(source, bindings) {
+  const scope = { ...bindings };
+  const lines = source.split('\n');
+  let skippingBlock = false;
+  let blockIndent = 0;
+
+  for (const rawLine of lines) {
+    const indent = rawLine.search(/\S|$/);
+    const line = rawLine.replace(/#.*$/, '').trim();
+    if (!line) continue;
+
+    if (skippingBlock) {
+      if (indent > blockIndent) {
+        continue;
+      }
+      skippingBlock = false;
+    }
+
+    // if condition:
+    const ifMatch = line.match(/^if\s+([A-Za-z_]\w*)\s*(==|!=|<|>|<=|>=)\s*([^:]+)\s*:/);
+    if (ifMatch) {
+      const leftName = ifMatch[1];
+      const op = ifMatch[2];
+      const rightRaw = ifMatch[3].trim().replace(/^['"]|['"]$/g, '');
+      const leftVal = scope[leftName];
+      const rightVal = /^-?\d+$/.test(rightRaw) ? Number(rightRaw) : rightRaw;
+
+      let condMet = false;
+      if (op === '==') condMet = String(leftVal) === String(rightVal);
+      if (op === '!=') condMet = String(leftVal) !== String(rightVal);
+      if (op === '<') condMet = Number(leftVal) < Number(rightVal);
+      if (op === '>') condMet = Number(leftVal) > Number(rightVal);
+      if (op === '<=') condMet = Number(leftVal) <= Number(rightVal);
+      if (op === '>=') condMet = Number(leftVal) >= Number(rightVal);
+
+      if (!condMet) {
+        skippingBlock = true;
+        blockIndent = indent;
+        continue;
+      }
+    }
+
+    // Check for `raise HTTPException(status_code=N, detail="...")`
+    const raiseMatch = line.match(/^raise\s+HTTPException\(\s*status_code\s*=\s*(\d{3})(?:,\s*detail\s*=\s*['"]([^'"]+)['"])?\s*\)/);
+    if (raiseMatch) {
+      return {
+        bound: null,
+        earlyReturn: {
+          status: parseInt(raiseMatch[1], 10),
+          detail: raiseMatch[2] || 'error',
+        },
+      };
+    }
+
+    // Direct return statement in executed block
+    if (/^return(\s+.*|\{.*|\[.*|$)/.test(line)) {
+      const idx = source.indexOf(rawLine);
+      const rest = idx >= 0 ? source.slice(idx) : rawLine;
+      const retStr = extractReturnLiteral(rest);
+      const val = bindValue(parseLiteral(retStr), scope);
+      return { bound: val };
+    }
+
+    // Assignment: var_name = expr or var_name <- expr
+    const assignMatch = line.match(/^([A-Za-z_]\w*)\s*(?:=|<-)\s*([^=].*)$/);
+    if (assignMatch && !line.startsWith('if ') && !line.startsWith('return ')) {
+      const varName = assignMatch[1];
+      const expr = assignMatch[2].trim();
+
+      // Math: a + b, a - b, etc.
+      const mathMatch = expr.match(/^([A-Za-z_]\w*|\d+)\s*([\+\-\*\/])\s*([A-Za-z_]\w*|\d+)$/);
+      if (mathMatch) {
+        const leftVal = mathMatch[1] in scope ? Number(scope[mathMatch[1]]) : Number(mathMatch[1]);
+        const rightVal = mathMatch[3] in scope ? Number(scope[mathMatch[3]]) : Number(mathMatch[3]);
+        if (!Number.isNaN(leftVal) && !Number.isNaN(rightVal)) {
+          if (mathMatch[2] === '+') scope[varName] = leftVal + rightVal;
+          if (mathMatch[2] === '-') scope[varName] = leftVal - rightVal;
+          if (mathMatch[2] === '*') scope[varName] = leftVal * rightVal;
+          if (mathMatch[2] === '/') scope[varName] = leftVal / rightVal;
+          continue;
+        }
+      }
+
+      // f-string: f"hello {name}"
+      const fStringMatch = expr.match(/^f['"](.*)['"]$/);
+      if (fStringMatch) {
+        scope[varName] = fStringMatch[1].replace(/\{(\w+)\}/g, (_, k) =>
+          scope[k] !== undefined ? String(scope[k]) : ''
+        );
+        continue;
+      }
+
+      // Literal or variable reference
+      if (expr in scope) {
+        scope[varName] = scope[expr];
+      } else {
+        scope[varName] = parseLiteral(expr);
+      }
+    }
+  }
+
+  const templateStr = extractReturnLiteral(source);
+  const parsedTemplate = parseLiteral(templateStr);
+  const bound = bindValue(parsedTemplate, scope);
+
+  return { bound };
+}
+
+/**
+ * Split Python def arguments on top-level commas.
+ * @param {string} raw
+ * @returns {string[]}
+ */
+export function splitArgs(raw) {
+  const parts = [];
+  let depth = 0;
+  let cur = '';
+  for (const ch of raw) {
+    if (ch === '(' || ch === '[' || ch === '{') depth++;
+    if (ch === ')' || ch === ']' || ch === '}') depth--;
+    if (ch === ',' && depth === 0) {
+      parts.push(cur);
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  if (cur.trim()) parts.push(cur);
+  return parts.filter((p) => p.trim());
+}
+
+/**
+ * Parse FastAPI Python source into routes, models, and dependencies.
  * @param {string} source
  * @returns {ParsedApp}
  */
-function parsePython(source) {
+export function parsePython(source) {
   /** @type {ParsedApp} */
   const app = {
     language: 'python',
@@ -331,7 +460,7 @@ function parsePython(source) {
     if (v) app.version = v[1];
   }
 
-  // Pydantic-ish models
+  // Pydantic models
   const classRe = /class\s+(\w+)\s*(?:\(([^)]*)\))?\s*:\n([\s\S]*?)(?=\nclass\s|\n@app\.|\nif\s|$)/g;
   let cm;
   while ((cm = classRe.exec(source))) {
@@ -342,10 +471,11 @@ function parsePython(source) {
       const fm = line.match(/^\s{4}(\w+)\s*:\s*([^=\n]+?)\s*=\s*(.+)$/)
         || line.match(/^\s{4}(\w+)\s*:\s*([^=\n]+)$/);
       if (!fm) continue;
-      const type = fm[2].trim().replace(/\[.*$/, '').trim();
+      const rawType = fm[2].trim();
+      const type = rawType.replace(/\[.*$/, '').replace(/\|.*$/, '').trim();
       fields[fm[1]] = {
         type,
-        required: fm[3] === undefined,
+        required: fm[3] === undefined && !rawType.includes('None') && !rawType.includes('Optional'),
         example: fm[3] !== undefined ? parseLiteral(fm[3]) : undefined,
       };
     }
@@ -369,6 +499,7 @@ function parsePython(source) {
     }
   }
 
+  // Routes: @app.get(...), @app.post(...)
   const routeRe = /@app\.(get|post|put|patch|delete)\s*\(\s*(['"])([^'"]+)\2([^)]*)\)/g;
   let rm;
   while ((rm = routeRe.exec(source))) {
@@ -382,7 +513,7 @@ function parsePython(source) {
     let bodyRaw = '';
     if (defHead) {
       const parenStart = after.indexOf('(', defHead.index + defHead[0].length - 1);
-      const paramsBlock = extractBracesOrParens(after, parenStart);
+      const paramsBlock = extractBalanced(after, parenStart, '(', ')');
       paramsRaw = paramsBlock.slice(1, -1);
       const afterParams = after.slice(parenStart + paramsBlock.length);
       const bodyM = afterParams.match(/^\s*(?:->\s*[^:]+)?\s*:\n([\s\S]*?)(?=\n@|\ndef\s|\nasync\s|\nclass\s|$)/);
@@ -394,10 +525,11 @@ function parsePython(source) {
     for (const m of path.matchAll(/\{(\w+)(?::(\w+))?\}/g)) {
       pathParams[m[1]] = m[2] || 'str';
     }
-    // FastAPI path params are untyped in the path string; types live in the
-    // function signature (`user_id: int`). Upgrade defaults from the signature.
-    for (const part of splitArgs(paramsRaw)) {
-      const sig = part.match(/^\s*self\s*,?/) ? null : part.match(/^\s*(\w+)\s*:\s*([A-Za-z_][\w\[\], .]*)/);
+
+    const cleanParamsRaw = paramsRaw.replace(/#.*$/gm, '').replace(/\/\/.*$/gm, '');
+
+    for (const part of splitArgs(cleanParamsRaw)) {
+      const sig = part.match(/^\s*self\s*,?/) ? null : part.match(/^\s*(\w+)\s*:\s*([A-Za-z_][\w\[\], .|]*)/);
       if (sig && pathParams[sig[1]] !== undefined) {
         pathParams[sig[1]] = sig[2].trim().split('=')[0].trim();
       }
@@ -412,7 +544,7 @@ function parsePython(source) {
     let body = null;
     let bodyModel = null;
 
-    for (const part of splitArgs(paramsRaw)) {
+    for (const part of splitArgs(cleanParamsRaw)) {
       const nm = part.match(/^\s*(\w+)\s*(?::\s*([^=]+?))?\s*(?:=\s*(.+))?$/s);
       if (!nm) continue;
       const name = nm[1];
@@ -420,17 +552,16 @@ function parsePython(source) {
       const type = (nm[2] || 'str').trim().split('=')[0].trim();
       const def = nm[3];
       if (pathParams[name] !== undefined) {
-        // keep signature type on the path param
         if (nm[2]) pathParams[name] = type;
         continue;
       }
-      // Depends(get_settings) → dependency, not a client field
+
       const dep = (def || type || '').match(/Depends\s*\(\s*([A-Za-z_][\w]*)\s*\)/);
       if (dep) {
         deps.push(dep[1]);
         continue;
       }
-      // Header(...) / Header("X-API-Key") → required HTTP header
+
       const hdr = (def || type || '').match(/Header\s*\(\s*([.A-Za-z_]|'[^']*'|"[^"]*")/);
       if (hdr || /Header\b/.test(type) || /Header\b/.test(def || '')) {
         let alias = name.replace(/_/g, '-');
@@ -446,11 +577,17 @@ function parsePython(source) {
         };
         continue;
       }
+
       if (Object.keys(app.models).includes(type) || /BaseModel|User|Item|Create|Request/.test(type)) {
         body = { type, required: def === undefined };
         bodyModel = type;
       } else {
-        query[name] = { type, required: def === undefined };
+        const parsedDef = def !== undefined ? parseLiteral(def) : undefined;
+        query[name] = {
+          type,
+          required: def === undefined && !rawType.includes('None') && !rawType.includes('Optional'),
+          default: parsedDef,
+        };
       }
     }
 
@@ -475,7 +612,7 @@ function parsePython(source) {
         ifEquals: /^-?\d+$/.test(raw) ? Number(raw) : raw,
       });
     }
-    // Any HTTPException without a simple if — still counts for codeContains / docs
+
     if (/HTTPException\s*\(/.test(bodyRaw) && !raises.length) {
       const st = bodyRaw.match(/HTTPException\(\s*status_code\s*=\s*(\d{3})/);
       raises.push({
@@ -504,42 +641,17 @@ function parsePython(source) {
   }
 
   if (!app.routes.length && /@app\./.test(source)) {
-    app.errors.push('Found @app decorators but no routes parsed — check syntax.');
+    app.errors.push('Found @app decorators but no routes parsed — verify indentation and syntax.');
   }
   return app;
 }
 
 /**
- * Split Python def params on top-level commas.
- *
- * @param {string} raw
- * @returns {string[]}
- */
-function splitArgs(raw) {
-  const parts = [];
-  let depth = 0;
-  let cur = '';
-  for (const ch of raw) {
-    if (ch === '(' || ch === '[' || ch === '{') depth++;
-    if (ch === ')' || ch === ']' || ch === '}') depth--;
-    if (ch === ',' && depth === 0) {
-      parts.push(cur);
-      cur = '';
-    } else {
-      cur += ch;
-    }
-  }
-  if (cur.trim()) parts.push(cur);
-  return parts.filter((p) => p.trim());
-}
-
-/**
- * Parse plumber-style R source (annotation comments + functions).
- *
+ * Parse plumber R source annotations and functions.
  * @param {string} source
  * @returns {ParsedApp}
  */
-function parseR(source) {
+export function parseR(source) {
   /** @type {ParsedApp} */
   const app = {
     language: 'r',
@@ -556,9 +668,7 @@ function parseR(source) {
   if (title) app.title = title[1].trim();
   if (ver) app.version = ver[1].trim();
 
-  // Split into annotation blocks: lines of #* @... followed by a function
-  // NOTE: `#\*` is a literal '#*'; a bare `#*` in regex means zero-or-more '#'.
-  const blockRe = /((?:^\s*#\*\s*@(?!api)\w+[^\n]*\n)+)^\s*((?:async\s+)?function\s*\([^)]*\)\s*\{[\s\S]*?\n\})/gm;
+  const blockRe = /((?:^\s*#\*(?!\s*@api)[^\n]*\n)+)^\s*((?:async\s+)?function\s*\([^)]*\)\s*\{[\s\S]*?\n\})/gm;
   let bm;
   while ((bm = blockRe.exec(source))) {
     const annotations = bm[1];
@@ -571,16 +681,19 @@ function parseR(source) {
 
     /** @type {Record<string, string>} */
     const pathParams = {};
+    for (const m of methodPath[2].matchAll(/<(\w+)(?::(\w+))?>/g)) {
+      pathParams[m[1]] = m[2] || 'str';
+    }
     for (const m of path.matchAll(/\{(\w+)\}/g)) {
-      pathParams[m[1]] = 'unknown';
+      if (!pathParams[m[1]]) pathParams[m[1]] = 'str';
     }
 
     /** @type {Record<string, {type: string, required: boolean}>} */
     const query = {};
     for (const pm of annotations.matchAll(/@param\s+([^:\s]+)(?::(\w+))?/g)) {
       const name = pm[1].replace(/[<{}>]/g, '');
-      if (pathParams[name]) {
-        pathParams[name] = pm[2] || 'unknown';
+      if (pathParams[name] !== undefined) {
+        if (pm[2]) pathParams[name] = pm[2];
       } else {
         query[name] = { type: pm[2] || 'string', required: true };
       }
@@ -619,19 +732,17 @@ function parseR(source) {
     });
   }
 
-  // Fallback: @get /path without captured function body
   const loose = [...source.matchAll(/#\*\s*@(get|post|put|patch|delete)\s+(\S+)/gi)];
   if (!app.routes.length && loose.length) {
-    app.errors.push('Found plumber annotations but no handler functions — attach function() { ... }.');
+    app.errors.push('Found plumber annotations but no handler functions attached.');
   }
   return app;
 }
 
 /**
- * Detect language and parse.
- *
+ * Detect language and parse source code.
  * @param {string} source
- * @param {'python'|'r'|'auto'} [language]
+ * @param {'python'|'r'|'auto'} [language='auto']
  * @returns {ParsedApp}
  */
 export function parseSource(source, language = 'auto') {
@@ -647,20 +758,21 @@ export function parseSource(source, language = 'auto') {
 }
 
 /**
- * Match a request against the route table.
- *
+ * Match an incoming request against route table.
  * @param {Route[]} routes
- * @param {HttpMethod} method
+ * @param {HttpMethod|string} method
  * @param {string} path
  * @returns {{ route: Route, params: Record<string, string> } | null}
  */
 export function matchRoute(routes, method, path) {
+  const normMethod = String(method).toUpperCase();
   const p = normalizePathParams(path.split('?')[0]);
   for (const route of routes) {
-    if (route.method !== method) continue;
+    if (route.method !== normMethod) continue;
     const routeParts = route.path.split('/').filter(Boolean);
     const reqParts = p.split('/').filter(Boolean);
     if (routeParts.length !== reqParts.length) continue;
+
     /** @type {Record<string, string>} */
     const params = {};
     let ok = true;
@@ -681,34 +793,7 @@ export function matchRoute(routes, method, path) {
 }
 
 /**
- * Coerce a string binding to match a declared parameter type.
- *
- * @param {unknown} raw
- * @param {string} type
- * @returns {unknown}
- */
-function coerce(raw, type) {
-  const t = (type || '').toLowerCase();
-  if (raw === undefined || raw === null || raw === '') return raw;
-  if (['int', 'integer', 'long'].includes(t)) {
-    const n = Number(raw);
-    return Number.isNaN(n) ? raw : Math.trunc(n);
-  }
-  if (['float', 'double', 'number', 'numeric'].includes(t)) {
-    const n = Number(raw);
-    return Number.isNaN(n) ? raw : n;
-  }
-  if (['bool', 'boolean'].includes(t)) {
-    if (raw === true || raw === 'true' || raw === 'True') return true;
-    if (raw === false || raw === 'false' || raw === 'False') return false;
-    return raw;
-  }
-  return raw;
-}
-
-/**
- * Build bindings for handler interpolation.
- *
+ * Build bindings map for request context.
  * @param {Route} route
  * @param {Record<string, string>} pathParams
  * @param {Record<string, string>} query
@@ -716,9 +801,14 @@ function coerce(raw, type) {
  * @param {ParsedApp} [parsedApp]
  * @returns {Record<string, unknown>}
  */
-function buildBindings(route, pathParams, query, body, parsedApp) {
+export function buildBindings(route, pathParams, query, body, parsedApp) {
   /** @type {Record<string, unknown>} */
   const b = {};
+  for (const [k, meta] of Object.entries(route.query || {})) {
+    if (meta.default !== undefined) {
+      b[k] = meta.default;
+    }
+  }
   for (const [k, v] of Object.entries(pathParams)) {
     b[k] = coerce(v, route.params[k]);
   }
@@ -731,7 +821,8 @@ function buildBindings(route, pathParams, query, body, parsedApp) {
       b[`body.${k}`] = v;
     }
   }
-  // Inject Depends() providers (mock FastAPI DI)
+
+  // Inject Depends providers
   if (parsedApp?.dependencies && route.deps?.length) {
     for (const dep of route.deps) {
       const val = parsedApp.dependencies[dep];
@@ -750,7 +841,7 @@ function buildBindings(route, pathParams, query, body, parsedApp) {
 }
 
 /**
- * Execute a mock request against a parsed app.
+ * Execute a mock HTTP request against parsed application.
  *
  * @param {ParsedApp} parsed
  * @param {{ method: HttpMethod|string, path: string, query?: Record<string, string>, body?: unknown, headers?: Record<string, string> }} req
@@ -760,11 +851,13 @@ export function executeRequest(parsed, req) {
   const method = String(req.method).toUpperCase();
   const rawPath = req.path || '/';
   const [pathname, qs] = rawPath.split('?');
+
   /** @type {Record<string, string>} */
   const query = { ...(req.query || {}) };
   if (qs) {
     for (const [k, v] of new URLSearchParams(qs)) query[k] = v;
   }
+
   /** @type {Record<string, string>} */
   const reqHeaders = {};
   for (const [k, v] of Object.entries(req.headers || {})) {
@@ -784,14 +877,14 @@ export function executeRequest(parsed, req) {
     };
   }
 
-  // Required Header(...) params — mock auth gate
+  // Required header validation (API key auth gate)
   for (const [name, meta] of Object.entries(hit.route.headers || {})) {
     if (!meta.required) continue;
     const alias = (meta.alias || name).toLowerCase();
     const present =
       reqHeaders[alias] !== undefined ||
       reqHeaders[name.toLowerCase()] !== undefined ||
-      reqHeaders['x-api-key'] !== undefined && /api[_-]?key|token/i.test(name);
+      (reqHeaders['x-api-key'] !== undefined && /api[_-]?key|token/i.test(name));
     if (!present) {
       return {
         status: 401,
@@ -805,33 +898,7 @@ export function executeRequest(parsed, req) {
     }
   }
 
-  const bindings = buildBindings(hit.route, hit.params, query, req.body, parsed);
-  const template = parseLiteral(extractReturnLiteral(hit.route.source));
-  const bound = bindValue(template, bindings);
-
-  // Simple `if param == value: raise HTTPException(status_code=N)`
-  for (const rule of hit.route.raises || []) {
-    if (rule.ifParam === undefined) continue;
-    const actual =
-      hit.params[rule.ifParam] !== undefined
-        ? coerce(hit.params[rule.ifParam], hit.route.params[rule.ifParam])
-        : query[rule.ifParam] !== undefined
-          ? coerce(query[rule.ifParam], hit.route.query[rule.ifParam]?.type)
-          : bindings[rule.ifParam];
-    if (String(actual) === String(rule.ifEquals)) {
-      return {
-        status: rule.status,
-        ok: false,
-        headers: { 'content-type': 'application/json' },
-        body: { detail: rule.detail || 'error' },
-        matched: hit.route,
-        params: hit.params,
-        error: 'http_exception',
-      };
-    }
-  }
-
-  // Simulate missing required path typing lightly
+  // Path parameter integer validation -> 422
   for (const [k, t] of Object.entries(hit.route.params)) {
     const tn = (t || '').toLowerCase();
     if ((tn === 'int' || tn === 'integer') && Number.isNaN(Number(hit.params[k]))) {
@@ -855,22 +922,59 @@ export function executeRequest(parsed, req) {
     }
   }
 
+  const bindings = buildBindings(hit.route, hit.params, query, req.body, parsed);
+
+  // Check explicit raises rules
+  for (const rule of hit.route.raises || []) {
+    if (rule.ifParam === undefined) continue;
+    const actual =
+      hit.params[rule.ifParam] !== undefined
+        ? coerce(hit.params[rule.ifParam], hit.route.params[rule.ifParam])
+        : query[rule.ifParam] !== undefined
+          ? coerce(query[rule.ifParam], hit.route.query[rule.ifParam]?.type)
+          : bindings[rule.ifParam];
+    if (String(actual) === String(rule.ifEquals)) {
+      return {
+        status: rule.status,
+        ok: false,
+        headers: { 'content-type': 'application/json' },
+        body: { detail: rule.detail || 'error' },
+        matched: hit.route,
+        params: hit.params,
+        error: 'http_exception',
+      };
+    }
+  }
+
+  // Micro-evaluate handler body
+  const evalResult = evaluateHandler(hit.route.source, bindings);
+  if (evalResult.earlyReturn) {
+    return {
+      status: evalResult.earlyReturn.status,
+      ok: false,
+      headers: { 'content-type': 'application/json' },
+      body: { detail: evalResult.earlyReturn.detail },
+      matched: hit.route,
+      params: hit.params,
+      error: 'http_exception',
+    };
+  }
+
   const status = hit.route.status;
   return {
     status,
     ok: status >= 200 && status < 300,
     headers: { 'content-type': 'application/json' },
-    body: bound === null ? null : bound,
+    body: evalResult.bound === null ? null : evalResult.bound,
     matched: hit.route,
     params: hit.params,
   };
 }
 
 /**
- * Create an immutable app snapshot from source.
- *
+ * Create immutable app snapshot from source.
  * @param {string} source
- * @param {'python'|'r'|'auto'} [language]
+ * @param {'python'|'r'|'auto'} [language='auto']
  * @returns {ParsedApp & { call: (req: object) => ReturnType<typeof executeRequest> }}
  */
 export function createApp(source, language = 'auto') {
@@ -884,14 +988,13 @@ export function createApp(source, language = 'auto') {
 }
 
 /**
- * Template a return literal (used by demos and tests).
- *
+ * Template return literal with bindings.
  * @param {string} bodySource
  * @param {Record<string, unknown>} bindings
  * @returns {unknown}
  */
 export function renderHandlerBody(bodySource, bindings) {
-  return bindValue(parseLiteral(extractReturnLiteral(bodySource)), bindings);
+  return evaluateHandler(bodySource, bindings).bound;
 }
 
 export const __internals = {
@@ -899,10 +1002,10 @@ export const __internals = {
   normalizePathParams,
   parseLiteral,
   extractReturnLiteral,
-  extractBraces,
-  extractBracesOrParens,
+  extractBalanced,
   bindValue,
   buildBindings,
   coerce,
+  evaluateHandler,
   METHODS,
 };
