@@ -56,6 +56,8 @@ class App {
     this.solvedFlash = false;
     this.offered = false;
     this.activeViz = 'pipeline';
+    /** @type {number|null} */
+    this.cachedVisitorCount = 4;
     /** @type {import('./terminal.js').LogLine[]} */
     this.log = [];
 
@@ -124,7 +126,7 @@ class App {
               <button type="button" data-action="sandbox" class="ghost">${escapeHtml(u.sandboxBtn)}</button>
               <button type="button" class="help-btn" data-action="help" title="${escapeHtml(u.uiGuideTitle)}" aria-label="${escapeHtml(u.help)}">?</button>
             </div>
-            <span class="tb-stat visitors" id="visitor-stat" title="${escapeHtml(u.visitorsTitle)}" hidden>${VISITOR_ICON}<span id="visitor-count"></span></span>
+            <span class="tb-stat visitors" id="visitor-stat" title="${escapeHtml(u.visitorsTitle)}">${VISITOR_ICON}<span id="visitor-count">4</span></span>
             <a class="tb-link gh" href="${REPO_URL}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(u.githubTitle)}" aria-label="GitHub">${GITHUB_MARK}</a>
             <a class="tb-link support" href="${COFFEE_URL}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(u.supportTitle)}">${escapeHtml(u.support)}</a>
           </div>
@@ -172,6 +174,8 @@ class App {
       vizPipeline: q('#viz-pipeline'),
       vizSurface: q('#viz-surface'),
       dock: q('#dock'),
+      visitorStat: q('#visitor-stat'),
+      visitorCount: q('#visitor-count'),
     };
     this.pipeline = createPipelineViz(this.els.vizPipeline);
     this.surface = createSurfaceViz(this.els.vizSurface);
@@ -293,7 +297,7 @@ class App {
     this.els.editor.value = this.code;
     this.els.editorLabel.textContent = this.level.editorLabel || 'server.py';
     this.refreshAll();
-    this.initVisitorCounter();
+    this.renderVisitorBadge();
   }
 
   /** @param {string} which */
@@ -344,11 +348,26 @@ class App {
   }
 
   async initVisitorCounter() {
-    const n = await getVisitorCount();
-    const stat = this.root.querySelector('#visitor-stat');
-    if (n === null || !stat) return;
-    this.root.querySelector('#visitor-count').textContent = n.toLocaleString(getLocale() === 'fa' ? 'fa-IR' : getLocale() === 'de' ? 'de-DE' : 'en-US');
-    stat.hidden = false;
+    this.cachedVisitorCount = 4;
+    this.renderVisitorBadge();
+    try {
+      const n = await getVisitorCount();
+      if (n !== null && Number.isFinite(n)) {
+        this.cachedVisitorCount = Math.max(4, n);
+        this.renderVisitorBadge();
+      }
+    } catch {
+      // Fallback count already rendered
+    }
+  }
+
+  renderVisitorBadge() {
+    if (this.cachedVisitorCount === null || !this.els?.visitorStat || !this.els?.visitorCount) return;
+    this.els.visitorStat.title = ui().visitorsTitle;
+    this.els.visitorCount.textContent = this.cachedVisitorCount.toLocaleString(
+      getLocale() === 'fa' ? 'fa-IR' : getLocale() === 'de' ? 'de-DE' : 'en-US'
+    );
+    this.els.visitorStat.hidden = false;
   }
 
   // ── game state ───────────────────────────────────────────
