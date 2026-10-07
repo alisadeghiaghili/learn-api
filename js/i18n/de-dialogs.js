@@ -546,4 +546,217 @@ export const DE_DIALOGS = {
       ],
     ],
   },
+
+  'http-03': {
+    intro: [
+      '## HTTP-Caching und bedingte Anfragen (ETag & 304)',
+      'HTTP nutzt Entity-Tags (**ETag**), um Netzwerkübertragungen und Serverlast zu minimieren.',
+      'Sendet der Client im Folgeaufruf den Header `If-None-Match` mit dem aktuellen ETag, antwortet der Server schlank mit **304 Not Modified** ohne Body.',
+    ],
+    slides: [
+      [
+        '## Cache-Validierung mit ETag',
+        'Der Server liefert im Antwort-Header einen ETag-Hash der Ressource mit. Bei Folgeanfragen prüft der Client mit `If-None-Match`, ob sich der Inhalt geändert hat.',
+      ],
+      [
+        '## Interna: 304 Not Modified ohne Payload',
+        'Stimmt der Hash überein, sendet der Server Status 304 ohne Datenkörper. Das spart Bandbreite und schont die Datenbank.',
+      ],
+      [
+        '## Standard-Codemuster',
+        '```python\n' +
+        'from fastapi import FastAPI, Header, HTTPException\n\n' +
+        'app = FastAPI(title="Caching API")\n\n' +
+        '@app.get("/items")\n' +
+        'def get_items(if_none_match: str = Header(None, alias="If-None-Match")):\n' +
+        '    if if_none_match == "etag-v1":\n' +
+        '        raise HTTPException(status_code=304, detail="Not Modified")\n' +
+        '    return {"items": ["alpha", "beta"], "etag": "etag-v1"}\n' +
+        '```',
+      ],
+    ],
+  },
+
+  'fastapi-10': {
+    intro: [
+      '## Paginierung (Pagination) und Envelope-Muster',
+      'Das Ausliefern unbeschränkter Datensätze gefährdet die Stabilität. Paginierung mit `limit` und `offset` begrenzt die Datenmenge.',
+      'Das Envelope-Muster kapselt Datensätze in `items` zusammen mit Metadaten wie `total`, `limit` und `offset`.',
+    ],
+    slides: [
+      [
+        '## Warum Paginierung unerlässlich ist',
+        'Wachsende Datenbanken verlangen planbaren Ressourcenverbrauch. Unpaginierte Endpoints führen unweigerlich zu Speicherüberläufen.',
+      ],
+      [
+        '## Struktur des Response-Envelopes',
+        'Statt roher JSON-Arrays liefert der Endpoint ein Objekt mit Metadaten zurück:\n\n' +
+        '```json\n' +
+        '{\n' +
+        '  "items": [...],\n' +
+        '  "total": 100,\n' +
+        '  "limit": 10,\n' +
+        '  "offset": 0\n' +
+        '}\n' +
+        '```',
+      ],
+      [
+        '## Standard-Codemuster',
+        '```python\n' +
+        '@app.get("/products")\n' +
+        'def list_products(limit: int = 10, offset: int = 0):\n' +
+        '    return {"items": ["item1", "item2"], "total": 100, "limit": limit, "offset": offset}\n' +
+        '```',
+      ],
+    ],
+  },
+
+  'fastapi-11': {
+    intro: [
+      '## Authentifizierung mit Bearer Token (RFC 6750)',
+      'In modernen APIs übermittelt der Client nach dem Login ein Zugriffstoken im Header `Authorization: Bearer <token>`.',
+      'Der Server validiert das Token; bei ungültigen Angaben wird die Anfrage mit **401 Unauthorized** abgewiesen.',
+    ],
+    slides: [
+      [
+        '## Der Authorization Header und das Bearer-Schema',
+        'Gemäß RFC 6750 wird das Token mit dem Präfix `Bearer ` im Authorization-Header übergeben.',
+      ],
+      [
+        '## Interna: Sicherheitsprüfungen',
+        'FastAPI extrahiert den Header und prüft die Gültigkeit, um die Identität des Aufrufers festzustellen.',
+      ],
+      [
+        '## Standard-Codemuster',
+        '```python\n' +
+        '@app.get("/profile")\n' +
+        'def get_profile(authorization: str = Header(...)):\n' +
+        '    if authorization != "Bearer secret-token-123":\n' +
+        '        raise HTTPException(status_code=401, detail="Invalid token")\n' +
+        '    return {"user": "alice", "role": "admin"}\n' +
+        '```',
+      ],
+    ],
+  },
+
+  'fastapi-12': {
+    intro: [
+      '## Rollenbasierte Autorisierung (RBAC) & 403 Forbidden',
+      'Die Unterscheidung zwischen Authentifizierung (Wer bist du?) und Autorisierung (Was darfst du?) ist ein Grundpfeiler moderner Sicherheit.',
+      'Verfügt ein authentifizierter Nutzer nicht über die erforderliche Rolle, antwortet der Server mit **403 Forbidden**.',
+    ],
+    slides: [
+      [
+        '## Unterschied zwischen 401 und 403',
+        '• **401 Unauthorized**: Der Aufrufer ist unauthentifiziert oder das Token fehlt/ist ungültig.\n' +
+        '• **403 Forbidden**: Der Aufrufer ist bekannt, hat aber keine Berechtigung für diesen Zugriff.',
+      ],
+      [
+        '## Autorisierungs-Guards',
+        'Rollen oder Scopes werden geprüft, bevor administrativer Code ausgeführt werden darf.',
+      ],
+      [
+        '## Standard-Codemuster',
+        '```python\n' +
+        '@app.get("/admin/audit")\n' +
+        'def audit_logs(x_role: str = Header("user", alias="X-Role")):\n' +
+        '    if x_role != "admin":\n' +
+        '        raise HTTPException(status_code=403, detail="Forbidden")\n' +
+        '    return {"audit": "access_granted", "status": "ok"}\n' +
+        '```',
+      ],
+    ],
+  },
+
+  'fastapi-13': {
+    intro: [
+      '## Rate Limiting & 429 Too Many Requests',
+      'Um Server vor Überlastung oder Endlosschleifen zu schützen, werden Kontingente pro Zeiteinheit festgelegt.',
+      'Wird das Limit überschritten, antwortet der Server mit **429 Too Many Requests**.',
+    ],
+    slides: [
+      [
+        '## Schutz nach RFC 6585',
+        'Status 429 signalisiert dem Client, dass das Ratenlimit erreicht wurde und er warten muss.',
+      ],
+      [
+        '## Telemetriedaten zur Quotensteuerung',
+        'Server senden Header wie `X-Rate-Limit` oder `Retry-After`, um Clients über Wartezeiten zu informieren.',
+      ],
+      [
+        '## Standard-Codemuster',
+        '```python\n' +
+        '@app.get("/compute")\n' +
+        'def compute(x_rate_limit: int = Header(10, alias="X-Rate-Limit")):\n' +
+        '    if x_rate_limit <= 0:\n' +
+        '        raise HTTPException(status_code=429, detail="Too Many Requests")\n' +
+        '    return {"result": 42, "remaining": x_rate_limit}\n' +
+        '```',
+      ],
+    ],
+  },
+
+  'plumber-04': {
+    intro: [
+      '## Plumber Filter & Middleware in R (#* @filter)',
+      'Filter in Plumber erlauben das Abfangen und Modifizieren eingehender Anfragen vor Erreichen der Routen-Handler.',
+      'Der Aufruf von `forward()` reicht die Kontrolle an das nächste Glied in der Verarbeitungskette weiter.',
+    ],
+    slides: [
+      [
+        '## Middleware-Konzept in Plumber',
+        'Das Tag `#* @filter` ermöglicht zentrales Logging, CORS-Header und Sicherheitsprüfungen in R.',
+      ],
+      [
+        '## Weiterleitung mit forward()',
+        'Ist eine Anfrage valide, übergibt `forward()` die Ausführung an die zuständigen Endpoints.',
+      ],
+      [
+        '## Standard-Codemuster',
+        '```r\n' +
+        'library(plumber)\n\n' +
+        '#* @filter logger\n' +
+        'function(req) {\n' +
+        '  forward()\n' +
+        '}\n\n' +
+        '#* @get /data\n' +
+        '#* @serializer json\n' +
+        'function() {\n' +
+        '  list(status = "ok", processed = TRUE)\n' +
+        '}\n' +
+        '```',
+      ],
+    ],
+  },
+
+  'openapi-03': {
+    intro: [
+      '## Fehlerverträge in OpenAPI / Swagger dokumentieren',
+      'Ein vollständiger OpenAPI-Vertrag dokumentiert neben Erfolgsantworten auch clientseitige Fehlerszenarien wie 404 Not Found.',
+      'FastAPI übernimmt `HTTPException`-Statuscodes automatisch in die Dokumentationsstruktur.',
+    ],
+    slides: [
+      [
+        '## Verträge für Fehlerfälle',
+        'Client-Entwickler müssen wissen, welche Fehlerstatuscodes und Payloads bei ungültigen Anfragen zu erwarten sind.',
+      ],
+      [
+        '## Abbildung in der Swagger responses Map',
+        'Die explizite Definition macht Fehlerzustände in Swagger UI und automatisierten Validierungstools sichtbar.',
+      ],
+      [
+        '## Standard-Codemuster',
+        '```python\n' +
+        'from fastapi import FastAPI, HTTPException\n\n' +
+        'app = FastAPI(title="Store API")\n\n' +
+        '@app.get("/orders/{order_id}")\n' +
+        'def get_order(order_id: int):\n' +
+        '    if order_id == 0:\n' +
+        '        raise HTTPException(status_code=404, detail="Order not found")\n' +
+        '    return {"order_id": order_id, "status": "shipped"}\n' +
+        '```',
+      ],
+    ],
+  },
 };
+

@@ -275,4 +275,110 @@ export const DE_LEVELS = {
       'Schreibe automatisierte Blackbox-Integrationstests, die das HTTP-Verhalten anstelle interner Sprach-Mocks testen.',
     ],
   },
+  'http-03': {
+    name: 'Caching & Bedingte Anfragen (ETag & 304)',
+    objective: 'Nutze Cache-Validierung mit ETag und If-None-Match Headern und antworte bei aktuellem Cache mit 304 Not Modified.',
+    hint: 'Definiere `@app.get("/items")` mit `if_none_match: str = Header(None, alias="If-None-Match")`. Wirf bei Übereinstimmung mit "etag-v1" 304 Not Modified.',
+    learning: [
+      'RFC 9111 HTTP Caching reduziert Serverlast und Bandbreite durch Entity Tags (ETags) drastisch.',
+      'Interna: Sendet der Client einen passenden `If-None-Match` Header, antwortet der Server mit 304 ohne Body.',
+      'Bedingte Anfragen schützen Datenbanken vor überflüssigen Abfragen und Serialisierungskosten.',
+    ],
+    fieldNotes: [
+      'Verwende Strong ETags (kryptografische Hashes) oder Weak ETags (W/) je nach Konsistenzanforderung.',
+      'Kombiniere ETags mit `Cache-Control` Anweisungen (max-age, must-revalidate) für CDNs und Browser.',
+      'Antworten mit Status 304 dürfen gemäß RFC 9110 keinen Nachrichtenkörper enthalten.',
+    ],
+  },
+  'fastapi-10': {
+    name: 'Paginierung & Envelope-Muster',
+    objective: 'Implementiere Standard-Paginierung mit limit und offset sowie eine strukturierte Envelope-Antwort.',
+    hint: 'Definiere `@app.get("/products")` mit `limit: int = 10` und `offset: int = 0` und gib ein Dict mit items, total, limit und offset zurück.',
+    learning: [
+      'Unbegrenzte Listen können Microservices überlasten; Paginierung mit limit und offset schützt den Speicher.',
+      'Das Envelope-Muster kapselt Datensätze in `items` neben Metadaten (`total`, `limit`, `offset`) für Erweiterbarkeit.',
+      'Interna: FastAPI bindet Abfrageparameter-Standardwerte typsicher und fehlertolerant.',
+    ],
+    fieldNotes: [
+      'Für Millionen Datensätze empfiehlt sich Cursor-Paginierung (Keyset) statt teurem SQL OFFSET.',
+      'Setze immer eine harte Obergrenze für limit (z. B. max 100) via `Query(le=100)` gegen DoS-Angriffe.',
+      'Standard-Paginierungs-Envelopes erleichtern Frontend-Tabellen die konsistente Seitennavigation.',
+    ],
+  },
+  'fastapi-11': {
+    name: 'Bearer Token Authentifizierung',
+    objective: 'Schütze Endpoints durch Validierung von Bearer Tokens im HTTP Authorization Header gemäß RFC 6750.',
+    hint: 'Lies `authorization: str = Header(...)` aus und wirf bei Abweichung von "Bearer secret-token-123" einen 401 Unauthorized Fehler.',
+    learning: [
+      'RFC 6750 definiert das Bearer Token Schema: Clients übermitteln Tokens via `Authorization: Bearer <token>`.',
+      'Interna: FastAPI extrahiert den Header, validiert die Signatur und stellt die authentifizierte Identität bereit.',
+      'Ungültige oder fehlende Tokens führen sofort zum Abbruch mit Status 401 Unauthorized.',
+    ],
+    fieldNotes: [
+      'Übertrage Bearer Tokens niemals über unverschlüsseltes HTTP; HTTPS mit TLS ist zwingend erforderlich.',
+      'Signiere Tokens asymmetrisch (RS256/EdDSA) mit kurzen Ablaufzeiten und separaten Refresh Tokens.',
+      'Vermeide detaillierte interne Fehlermeldungen in 401-Antworten zur Vermeidung von Informationslecks.',
+    ],
+  },
+  'fastapi-12': {
+    name: 'Rollenbasierte Autorisierung (RBAC) & 403',
+    objective: 'Erzwinge Zugriffskontrollen: Trenne Authentifizierung von Autorisierung und antworte bei fehlenden Rechten mit 403 Forbidden.',
+    hint: 'Lies in `@app.get("/admin/audit")` den Header `x_role: str = Header("user", alias="X-Role")` aus; wirf 403, wenn x_role nicht "admin" ist.',
+    learning: [
+      'Authentifizierung (Wer bist du?) ist strikt von Autorisierung (Was darfst du tun?) getrennt.',
+      'Status 401 bedeutet unauthentifiziert; Status 403 Forbidden signalisiert fehlende Berechtigungen.',
+      'Interna: Sicherheits-Guards prüfen Rollen-Claims vor Ausführung administrativer Handler-Logik.',
+    ],
+    fieldNotes: [
+      'Befolge das Prinzip der minimalen Rechtevergabe (Least Privilege): Standardmäßig verbieten, explizit erlauben.',
+      'In Multi-Tenant SaaS muss neben der Rolle auch die Mandantenzugehörigkeit geprüft werden (BOLA-Schutz).',
+      'Protokolliere abgewiesene 403-Ereignisse in Sicherheits-Audit-Logs zur Erkennung von Angriffsversuchen.',
+    ],
+  },
+  'fastapi-13': {
+    name: 'Rate Limiting & 429 Too Many Requests',
+    objective: 'Schütze API-Kapazitäten vor Überlastung durch Quotenprüfung und Status 429 Too Many Requests.',
+    hint: 'Lies `x_rate_limit: int = Header(10, alias="X-Rate-Limit")` aus und wirf bei Werten kleiner oder gleich 0 einen 429 Fehler.',
+    learning: [
+      'RFC 6585 definiert Status 429 Too Many Requests zum Schutz vor Denial-of-Service und Endlosschleifen.',
+      'Interna: Server erfassen Restkontingente pro IP oder API-Key mittels Token-Bucket in Redis oder Memory.',
+      'Produktions-APIs senden Telemetrie-Header wie `X-RateLimit-Remaining` und `Retry-After` mit.',
+    ],
+    fieldNotes: [
+      'Stufe Rate-Limits ab: Anonymer Traffic erhält strikte Grenzen, registrierte Kunden höhere Kontingente.',
+      'Sende bei 429 immer einen `Retry-After` Header, damit SDKs automatisches Backoff durchführen können.',
+      'Platziere Rate-Limiting vorzugsweise am API Gateway (Cloudflare/Nginx), um Backend-Worker zu entlasten.',
+    ],
+  },
+  'plumber-04': {
+    name: 'Plumber Filter & Pipeline-Hooks in R',
+    objective: 'Fange HTTP-Anfragen in R mit `#* @filter` ab und leite den Kontext via `forward()` an nachgelagerte Handler weiter.',
+    hint: 'Definiere in R `#* @filter logger` mit `function(req) { forward() }` gefolgt von Route `#* @get /data`.',
+    learning: [
+      'Plumber-Filter (`#* @filter`) fangen eingehende Anfragen vor den eigentlichen Routen-Handlern ab.',
+      'Interna: Die Funktion `forward()` reicht die Ausführungskontrolle in der Pipeline weiter.',
+      'Filter ermöglichen Logging, Ausführungszeitmessung, CORS-Header und Sicherheits-Guards in R.',
+    ],
+    fieldNotes: [
+      'Halte Filter schnell und nicht-blockierend, um die Single-Threaded Event Loop von R nicht auszubremsen.',
+      'Hänge Nachverfolgungsdaten (Request IDs, Timestamps) direkt an das `req` Objekt an.',
+      'Kombiniere Filter in Produktion mit globalem Error-Handling (`pr_set_error`) gegen Stacktrace-Leaks.',
+    ],
+  },
+  'openapi-03': {
+    name: 'Fehlerverträge in OpenAPI dokumentieren',
+    objective: 'Dokumentiere Client-Fehler (z. B. 404 Not Found) explizit im OpenAPI-Vertrag über strukturierte Fehlerbehandlung.',
+    hint: 'Implementiere `@app.get("/orders/{order_id}")`; wirf bei `order_id == 0` Status 404 mit detail="Order not found".',
+    learning: [
+      'Vollständige OpenAPI-Verträge dokumentieren neben 200 OK auch Fehlercodes (404, 400, 422).',
+      'Interna: FastAPI analysiert `HTTPException`-Statuscodes und integriert sie in die OpenAPI Responses Map.',
+      'Explizite Fehlerdokumentation ermöglicht automatisierten Contract-Tests (z. B. Schemathesis) das Prüfen von Grenzfällen.',
+    ],
+    fieldNotes: [
+      'Halte Fehlerantworten microservice-weit gemäß RFC 7807 (Problem Details) einheitlich.',
+      'Nutze Contract-Testing in CI/CD, um Diskrepanzen zwischen Spezifikation und Implementierung zu verhindern.',
+      'Präzise Fehlerverträge beschleunigen die Frontend-Integration und senken Supportanfragen signifikant.',
+    ],
+  },
 };
+

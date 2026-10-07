@@ -323,7 +323,7 @@ export function evaluateHandler(source, bindings) {
     }
 
     // if condition:
-    const ifMatch = line.match(/^if\s+([A-Za-z_]\w*)\s*(==|!=|<|>|<=|>=)\s*([^:]+)\s*:/);
+    const ifMatch = line.match(/^if\s+([A-Za-z_]\w*)\s*(<=|>=|==|!=|<|>)\s*([^:]+)\s*:/);
     if (ifMatch) {
       const leftName = ifMatch[1];
       const op = ifMatch[2];
@@ -567,15 +567,33 @@ export function parsePython(source) {
       const hdr = (def || type || '').match(/Header\s*\(\s*([.A-Za-z_]|'[^']*'|"[^"]*")/);
       if (hdr || /Header\b/.test(type) || /Header\b/.test(def || '')) {
         let alias = name.replace(/_/g, '-');
-        const aliasStr = (def || '').match(/Header\s*\(\s*['"]([^'"]+)['"]/);
-        if (aliasStr) alias = aliasStr[1];
-        if (/api_key|apikey|token/i.test(name) && !aliasStr) {
+        const aliasMatch = (def || '').match(/alias\s*=\s*['"]([^'"]+)['"]/);
+        const positionalStr = (def || '').match(/Header\s*\(\s*['"]([^'"]+)['"]/);
+        if (aliasMatch) {
+          alias = aliasMatch[1];
+        } else if (positionalStr && !/Header\s*\(\s*['"][^'"]*['"]\s*,\s*alias\s*=/.test(def || '')) {
+          alias = positionalStr[1];
+        }
+        if (/api_key|apikey|token/i.test(name) && !aliasMatch && !positionalStr) {
           alias = name.replace(/_/g, '-');
         }
+        const defaultLit = (def || '').match(/Header\s*\(\s*([^,\)]+)/);
+        let defaultVal = undefined;
+        if (defaultLit && !/^\s*\.\.\.\s*$/.test(defaultLit[1])) {
+          defaultVal = parseLiteral(defaultLit[1]);
+        }
+        const isOptional =
+          /Optional|None/.test(type) ||
+          /=\s*None/.test(def || '') ||
+          defaultVal === null ||
+          /Header\s*\(\s*None\b/.test(def || '');
+        const isEllipsis = /Header\s*\(\s*\.\.\./.test(def || '');
+
         headers[name] = {
-          type: 'str',
-          required: !/Optional|None/.test(type) && !/=\s*None/.test(def || ''),
+          type: type || 'str',
+          required: isEllipsis || (!isOptional && defaultVal === undefined),
           alias,
+          default: defaultVal,
         };
         continue;
       }
@@ -803,12 +821,25 @@ export function matchRoute(routes, method, path) {
  * @param {ParsedApp} [parsedApp]
  * @returns {Record<string, unknown>}
  */
-export function buildBindings(route, pathParams, query, body, parsedApp) {
+export function buildBindings(route, pathParams, query, body, parsedApp, reqHeaders = {}) {
   /** @type {Record<string, unknown>} */
   const b = {};
   for (const [k, meta] of Object.entries(route.query || {})) {
     if (meta.default !== undefined) {
       b[k] = meta.default;
+    }
+  }
+  for (const [name, meta] of Object.entries(route.headers || {})) {
+    if (meta.default !== undefined) {
+      b[name] = meta.default;
+    }
+    const alias = (meta.alias || name).toLowerCase();
+    const val =
+      reqHeaders[alias] ??
+      reqHeaders[name.toLowerCase()] ??
+      (alias === 'x-api-key' ? reqHeaders['x-api-key'] : undefined);
+    if (val !== undefined) {
+      b[name] = coerce(val, meta.type);
     }
   }
   for (const [k, v] of Object.entries(pathParams)) {
@@ -924,7 +955,7 @@ export function executeRequest(parsed, req) {
     }
   }
 
-  const bindings = buildBindings(hit.route, hit.params, query, req.body, parsed);
+  const bindings = buildBindings(hit.route, hit.params, query, req.body, parsed, reqHeaders);
 
   // Check explicit raises rules
   for (const rule of hit.route.raises || []) {

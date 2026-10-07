@@ -125,7 +125,7 @@ export function generateOpenAPI(parsed) {
   }
 
   const needsApiKey = parsed.routes.some((r) =>
-    Object.keys(r.headers || {}).some((h) => /api[_-]?key|token/i.test(h))
+    Object.keys(r.headers || {}).some((h) => /api[_-]?key|token|authorization/i.test(h))
   );
 
   const components = {};

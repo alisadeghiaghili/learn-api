@@ -191,6 +191,76 @@ def create_item():
       },
     ],
   },
+  {
+    id: 'http-03',
+    track: 'http',
+    language: 'python',
+    name: 'Caching & Conditional Requests (ETag & 304)',
+    objective: 'Inspect cache validation with the ETag and If-None-Match headers, returning 304 Not Modified when fresh.',
+    pattern: `@app.get("/items")\ndef get_items(if_none_match: str = Header(None, alias="If-None-Match")):\n    if if_none_match == "etag-v1":\n        raise HTTPException(status_code=304, detail="Not Modified")\n    return {"items": ["alpha", "beta"], "etag": "etag-v1"}`,
+    learning: [
+      'RFC 9111 HTTP caching reduces server load and bandwidth by validating client caches using entity tags (ETags).',
+      'Under the hood: When a client includes If-None-Match matching the resource ETag, the server short-circuits with 304 Not Modified without sending the body.',
+      'Conditional requests preserve high performance in high-throughput APIs, saving database queries and network serialization.',
+    ],
+    fieldNotes: [
+      'Always use strong ETags (cryptographic hashes of content) or weak ETags (W/"...") for dynamically generated JSON representations.',
+      'Combine ETags with Cache-Control headers (e.g. max-age, no-cache, must-revalidate) to guide browser and CDN reverse proxies.',
+      'Status 304 responses must omit the message body per RFC 9110, delivering zero payload overhead.',
+    ],
+    hint: 'Define `@app.get("/items")` with `if_none_match: str = Header(None, alias="If-None-Match")`. If `if_none_match == "etag-v1"` raise `HTTPException(status_code=304, detail="Not Modified")`, else return `{"items": ["alpha", "beta"], "etag": "etag-v1"}`.',
+    golf: 3,
+    editorLabel: 'server.py',
+    startCode: `from fastapi import FastAPI, Header, HTTPException
+
+app = FastAPI(title="Caching API")
+
+# TODO: Define @app.get("/items") with if_none_match: str = Header(None, alias="If-None-Match")
+# Return 304 if if_none_match == "etag-v1", else {"items": ["alpha", "beta"], "etag": "etag-v1"}
+`,
+    solutionCode: `from fastapi import FastAPI, Header, HTTPException
+
+app = FastAPI(title="Caching API")
+
+@app.get("/items")
+def get_items(if_none_match: str = Header(None, alias="If-None-Match")):
+    if if_none_match == "etag-v1":
+        raise HTTPException(status_code=304, detail="Not Modified")
+    return {"items": ["alpha", "beta"], "etag": "etag-v1"}
+`,
+    goal: {
+      endpoints: [{ method: 'GET', path: '/items' }],
+      codeContains: ['@app.get("/items")', 'if if_none_match == "etag-v1":', 'raise HTTPException(status_code=304'],
+      calls: [
+        { method: 'GET', path: '/items', headers: { 'if-none-match': 'etag-v1' }, expectStatus: 304 },
+        { method: 'GET', path: '/items', headers: {}, expectStatus: 200, expectBody: { etag: 'etag-v1' } },
+      ],
+    },
+    startDialog: [
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## HTTP Caching & Conditional Requests',
+          'RFC 9111 HTTP Caching uses entity tags (`ETag`) to avoid re-transmitting data that has not changed.',
+          'Clients send `If-None-Match: <etag>` on subsequent requests. If the entity has not mutated, the server replies with lightweight **304 Not Modified**.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Under the Hood: Zero-Payload 304',
+          'Status 304 short-circuits execution before building response bodies, saving network bandwidth and database serialization.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Code Pattern\n\n```python\n@app.get("/items")\ndef get_items(if_none_match: str = Header(None, alias="If-None-Match")):\n    if if_none_match == "etag-v1":\n        raise HTTPException(status_code=304, detail="Not Modified")\n    return {"items": ["alpha", "beta"], "etag": "etag-v1"}\n```',
+        ],
+      },
+      { type: 'GoalList' },
+    ],
+  },
 
   // ── FastAPI ───────────────────────────────────────────
   {
@@ -914,6 +984,285 @@ def get_user(user_id: int):
       { type: 'GoalList' },
     ],
   },
+  {
+    id: 'fastapi-10',
+    track: 'fastapi',
+    language: 'python',
+    name: 'Pagination & Envelope Pattern',
+    objective: 'Implement standard offset pagination and deliver a structured response envelope with metadata.',
+    pattern: `@app.get("/products")\ndef list_products(limit: int = 10, offset: int = 0):\n    return {"items": ["item1", "item2"], "total": 100, "limit": limit, "offset": offset}`,
+    learning: [
+      'Unbounded collections can crash microservices; pagination with limit and offset query parameters bounds database load per RFC 9110.',
+      'The envelope pattern nests the resource array under "items" alongside metadata ("total", "limit", "offset") to maintain contract extensibility.',
+      'Under the hood: Fast query parameter default bindings provide predictable defaults (limit=10, offset=0) without breaking clients.',
+    ],
+    fieldNotes: [
+      'For massive datasets (millions of rows), consider cursor-based pagination (e.g. keyset pagination) to avoid high SQL OFFSET penalties.',
+      'Always enforce a strict maximum ceiling on limit (e.g. max 100) using Pydantic Query(le=100) to prevent denial-of-service abuse.',
+      'Standard pagination envelopes enable client SDKs and UI data tables to render paginated pagination bars consistently.',
+    ],
+    hint: 'Define `@app.get("/products")` with query parameters `limit: int = 10` and `offset: int = 0` returning `{"items": ["item1", "item2"], "total": 100, "limit": limit, "offset": offset}`.',
+    golf: 2,
+    editorLabel: 'main.py',
+    startCode: `from fastapi import FastAPI
+
+app = FastAPI(title="Store API")
+
+# TODO: Define @app.get("/products") with limit: int = 10 and offset: int = 0
+# Return {"items": ["item1", "item2"], "total": 100, "limit": limit, "offset": offset}
+`,
+    solutionCode: `from fastapi import FastAPI
+
+app = FastAPI(title="Store API")
+
+@app.get("/products")
+def list_products(limit: int = 10, offset: int = 0):
+    return {"items": ["item1", "item2"], "total": 100, "limit": limit, "offset": offset}
+`,
+    goal: {
+      endpoints: [{ method: 'GET', path: '/products' }],
+      codeContains: ['@app.get("/products")', 'limit: int = 10', 'offset: int = 0', 'return {"items":'],
+      calls: [
+        { method: 'GET', path: '/products?limit=5&offset=20', expectStatus: 200, expectBody: { total: 100, limit: 5, offset: 20 } },
+        { method: 'GET', path: '/products', expectStatus: 200, expectBody: { total: 100, limit: 10, offset: 0 } },
+      ],
+    },
+    startDialog: [
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Pagination & Response Envelopes',
+          'APIs must never return unbounded datasets. Query parameters `limit` and `offset` give clients paging control.',
+          'Wrapping records inside an envelope `{"items": [...], "total": 100, ...}` preserves contract stability as metadata evolves.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Under the Hood: Default Query Values',
+          'FastAPI automatically extracts function parameters with defaults as optional query string arguments.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Code Pattern\n\n```python\n@app.get("/products")\ndef list_products(limit: int = 10, offset: int = 0):\n    return {"items": ["item1", "item2"], "total": 100, "limit": limit, "offset": offset}\n```',
+        ],
+      },
+      { type: 'GoalList' },
+    ],
+  },
+  {
+    id: 'fastapi-11',
+    track: 'fastapi',
+    language: 'python',
+    name: 'Bearer Token Authentication',
+    objective: 'Authenticate incoming requests using the HTTP Authorization Bearer token header per RFC 6750.',
+    pattern: `@app.get("/profile")\ndef get_profile(authorization: str = Header(...)):\n    if authorization != "Bearer secret-token-123":\n        raise HTTPException(status_code=401, detail="Invalid token")\n    return {"user": "alice", "role": "admin"}`,
+    learning: [
+      'RFC 6750 defines the Bearer token scheme: clients pass "Authorization: Bearer <token>" to access protected resource servers.',
+      'Under the hood: FastAPI extracts the Authorization header, validates token authenticity, and yields authenticated user identity.',
+      'If the bearer token is missing, invalid, or forged, the server rejects the request with HTTP 401 Unauthorized.',
+    ],
+    fieldNotes: [
+      'Never transmit Bearer tokens over unencrypted HTTP; always mandate HTTPS (TLS) to prevent packet sniffing.',
+      'Sign production bearer tokens using cryptographic asymmetric keys (RS256/ES256) with short expiration lifetimes and refresh tokens.',
+      'Avoid exposing sensitive stack traces or internal secret values in 401 Unauthorized detail responses.',
+    ],
+    hint: 'Define `@app.get("/profile")` with `authorization: str = Header(...)`. If `authorization != "Bearer secret-token-123"`, raise `HTTPException(status_code=401, detail="Invalid token")`, else return `{"user": "alice", "role": "admin"}`.',
+    golf: 3,
+    editorLabel: 'main.py',
+    startCode: `from fastapi import FastAPI, Header, HTTPException
+
+app = FastAPI(title="Secure API")
+
+# TODO: Define @app.get("/profile") with authorization: str = Header(...)
+# Verify authorization == "Bearer secret-token-123", else raise 401
+`,
+    solutionCode: `from fastapi import FastAPI, Header, HTTPException
+
+app = FastAPI(title="Secure API")
+
+@app.get("/profile")
+def get_profile(authorization: str = Header(...)):
+    if authorization != "Bearer secret-token-123":
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return {"user": "alice", "role": "admin"}
+`,
+    goal: {
+      endpoints: [{ method: 'GET', path: '/profile' }],
+      codeContains: ['@app.get("/profile")', 'authorization: str = Header(...)', 'raise HTTPException(status_code=401'],
+      openapiHas: ['components.securitySchemes.apiKeyAuth', 'paths./profile.get.security'],
+      calls: [
+        { method: 'GET', path: '/profile', headers: { authorization: 'Bearer secret-token-123' }, expectStatus: 200, expectBody: { user: 'alice', role: 'admin' } },
+        { method: 'GET', path: '/profile', headers: { authorization: 'Bearer wrong-key' }, expectStatus: 401 },
+      ],
+    },
+    startDialog: [
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Bearer Token Authentication (RFC 6750)',
+          'Modern APIs authenticate calls via `Authorization: Bearer <token>`.',
+          'FastAPI inspects the header, and rejections are delivered with RFC-standard **401 Unauthorized**.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Under the Hood: Auth Guard',
+          'Ellipsis (`Header(...)`) marks the header as mandatory. If absent or invalid, request processing immediately aborts.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Code Pattern\n\n```python\n@app.get("/profile")\ndef get_profile(authorization: str = Header(...)):\n    if authorization != "Bearer secret-token-123":\n        raise HTTPException(status_code=401, detail="Invalid token")\n    return {"user": "alice", "role": "admin"}\n```',
+        ],
+      },
+      { type: 'GoalList' },
+    ],
+  },
+  {
+    id: 'fastapi-12',
+    track: 'fastapi',
+    language: 'python',
+    name: 'Role-Based Access Control (RBAC) & 403',
+    objective: 'Enforce authorization permissions: verify user role and return 403 Forbidden when unauthorized.',
+    pattern: `@app.get("/admin/audit")\ndef audit_logs(x_role: str = Header("user", alias="X-Role")):\n    if x_role != "admin":\n        raise HTTPException(status_code=403, detail="Forbidden")\n    return {"audit": "access_granted", "status": "ok"}`,
+    learning: [
+      'Authentication (AuthN - who you are) is distinct from Authorization (AuthZ - what you can do) per RFC 9110.',
+      'HTTP 401 indicates unauthenticated identity; HTTP 403 Forbidden indicates an authenticated identity lacks required privileges.',
+      'Under the hood: Role-based guards verify claims before routing requests to privileged administrative handlers.',
+    ],
+    fieldNotes: [
+      'Follow the principle of least privilege: deny access by default and explicitly grant granular scopes or roles.',
+      'In multi-tenant SaaS, always verify both tenant organization ownership and user permissions to prevent BOLA vulnerabilities.',
+      'Log all 403 Forbidden rejection events in security audit logs to track potential privilege escalation attempts.',
+    ],
+    hint: 'Define `@app.get("/admin/audit")` with `x_role: str = Header("user", alias="X-Role")`. If `x_role != "admin"`, raise `HTTPException(status_code=403, detail="Forbidden")`, else return `{"audit": "access_granted", "status": "ok"}`.',
+    golf: 3,
+    editorLabel: 'main.py',
+    startCode: `from fastapi import FastAPI, Header, HTTPException
+
+app = FastAPI(title="RBAC API")
+
+# TODO: Define @app.get("/admin/audit") with x_role: str = Header("user", alias="X-Role")
+# Require x_role == "admin", else raise 403 Forbidden
+`,
+    solutionCode: `from fastapi import FastAPI, Header, HTTPException
+
+app = FastAPI(title="RBAC API")
+
+@app.get("/admin/audit")
+def audit_logs(x_role: str = Header("user", alias="X-Role")):
+    if x_role != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return {"audit": "access_granted", "status": "ok"}
+`,
+    goal: {
+      endpoints: [{ method: 'GET', path: '/admin/audit' }],
+      codeContains: ['@app.get("/admin/audit")', 'alias="X-Role"', 'raise HTTPException(status_code=403'],
+      calls: [
+        { method: 'GET', path: '/admin/audit', headers: { 'x-role': 'admin' }, expectStatus: 200, expectBody: { audit: 'access_granted', status: 'ok' } },
+        { method: 'GET', path: '/admin/audit', headers: { 'x-role': 'user' }, expectStatus: 403 },
+      ],
+    },
+    startDialog: [
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Role-Based Access Control (RBAC) & 403 Forbidden',
+          'Authentication tells the server *who* you are. Authorization decides *what* you can execute.',
+          'When an authenticated caller lacks administrative privileges, the server responds with **403 Forbidden**.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Under the Hood: 401 vs 403',
+          '• **401 Unauthorized**: Missing or invalid credentials.\n• **403 Forbidden**: Credentials recognized, but action forbidden.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Code Pattern\n\n```python\n@app.get("/admin/audit")\ndef audit_logs(x_role: str = Header("user", alias="X-Role")):\n    if x_role != "admin":\n        raise HTTPException(status_code=403, detail="Forbidden")\n    return {"audit": "access_granted", "status": "ok"}\n```',
+        ],
+      },
+      { type: 'GoalList' },
+    ],
+  },
+  {
+    id: 'fastapi-13',
+    track: 'fastapi',
+    language: 'python',
+    name: 'Rate Limiting & 429 Too Many Requests',
+    objective: 'Protect API resources from abuse by tracking quotas and responding with 429 Too Many Requests.',
+    pattern: `@app.get("/compute")\ndef compute(x_rate_limit: int = Header(10, alias="X-Rate-Limit")):\n    if x_rate_limit <= 0:\n        raise HTTPException(status_code=429, detail="Too Many Requests")\n    return {"result": 42, "remaining": x_rate_limit}`,
+    learning: [
+      'RFC 6585 defines HTTP 429 Too Many Requests to protect API backends from denial of service and runaway loops.',
+      'Rate limits are tracked by client IP or API key using token bucket or sliding window algorithms in memory or Redis.',
+      'Production APIs return rate-limit telemetry headers (e.g. X-Rate-Limit-Limit, X-Rate-Limit-Remaining, Retry-After).',
+    ],
+    fieldNotes: [
+      'Apply tiered rate limits: anonymous public traffic receives conservative limits while authenticated enterprise tiers receive higher throughput.',
+      'Always include Retry-After header with 429 responses so client SDKs can implement exponential backoff cleanly.',
+      'Place rate-limiting middleware at the API Gateway or reverse proxy level (Nginx/Envoy/Cloudflare) to absorb attacks before they reach ASGI workers.',
+    ],
+    hint: 'Define `@app.get("/compute")` with `x_rate_limit: int = Header(10, alias="X-Rate-Limit")`. If `x_rate_limit <= 0`, raise `HTTPException(status_code=429, detail="Too Many Requests")`, else return `{"result": 42, "remaining": x_rate_limit}`.',
+    golf: 3,
+    editorLabel: 'main.py',
+    startCode: `from fastapi import FastAPI, Header, HTTPException
+
+app = FastAPI(title="Rate Limit API")
+
+# TODO: Define @app.get("/compute") with x_rate_limit: int = Header(10, alias="X-Rate-Limit")
+# If x_rate_limit <= 0, raise 429 Too Many Requests
+`,
+    solutionCode: `from fastapi import FastAPI, Header, HTTPException
+
+app = FastAPI(title="Rate Limit API")
+
+@app.get("/compute")
+def compute(x_rate_limit: int = Header(10, alias="X-Rate-Limit")):
+    if x_rate_limit <= 0:
+        raise HTTPException(status_code=429, detail="Too Many Requests")
+    return {"result": 42, "remaining": x_rate_limit}
+`,
+    goal: {
+      endpoints: [{ method: 'GET', path: '/compute' }],
+      codeContains: ['@app.get("/compute")', 'alias="X-Rate-Limit"', 'raise HTTPException(status_code=429'],
+      calls: [
+        { method: 'GET', path: '/compute', headers: { 'x-rate-limit': '5' }, expectStatus: 200, expectBody: { result: 42, remaining: 5 } },
+        { method: 'GET', path: '/compute', headers: { 'x-rate-limit': '0' }, expectStatus: 429 },
+      ],
+    },
+    startDialog: [
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Rate Limiting & HTTP 429',
+          'RFC 6585 defines **429 Too Many Requests** to protect systems against denial-of-service and runaway loops.',
+          'Clients exceeding request quotas are blocked until quota replenishment.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Under the Hood: Telemetry Headers',
+          'Production APIs inject `X-Rate-Limit` and `Retry-After` headers to communicate quota replenishment timings to client SDKs.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Code Pattern\n\n```python\n@app.get("/compute")\ndef compute(x_rate_limit: int = Header(10, alias="X-Rate-Limit")):\n    if x_rate_limit <= 0:\n        raise HTTPException(status_code=429, detail="Too Many Requests")\n    return {"result": 42, "remaining": x_rate_limit}\n```',
+        ],
+      },
+      { type: 'GoalList' },
+    ],
+  },
 
   // ── plumber (R) ───────────────────────────────────────
   {
@@ -1136,6 +1485,80 @@ function(req) {
       { type: 'GoalList' },
     ],
   },
+  {
+    id: 'plumber-04',
+    track: 'plumber',
+    language: 'r',
+    name: 'Plumber Filters & Pipeline Hooks',
+    objective: 'Intercept requests with Plumber filters (#* @filter) in R to build logging and cross-cutting middleware.',
+    pattern: `#* @filter logger\nfunction(req) {\n  forward()\n}\n\n#* @get /data\n#* @serializer json\nfunction() {\n  list(status = "ok", processed = TRUE)\n}`,
+    learning: [
+      'Plumber filters declared with `#* @filter` intercept incoming HTTP requests before endpoint handlers run.',
+      'Under the hood: Filters invoke `forward()` to pass request context down the pipeline to subsequent filters and route handlers.',
+      'Filters enable cross-cutting concerns in R APIs such as request timing, CORS headers, authentication gates, and structured logging.',
+    ],
+    fieldNotes: [
+      'Keep Plumber filters fast and non-blocking to prevent clogging the single-threaded R execution event loop.',
+      'Use filters to attach global metadata (e.g. correlation IDs or timestamps) onto the request object for downstream analytics.',
+      'In production R, pair Plumber filters with proper error-handling hooks (`pr_set_error`) to prevent raw R error trace leakage.',
+    ],
+    hint: 'Define `#* @filter logger` with `function(req) { forward() }` followed by `#* @get /data` returning `list(status = "ok", processed = TRUE)`.',
+    golf: 4,
+    editorLabel: 'entrypoint.R',
+    startCode: `library(plumber)
+
+#* @apiTitle Production Plumber API
+
+# TODO: Add #* @filter logger with function(req) { forward() }
+# TODO: Add #* @get /data with #* @serializer json returning list(status = "ok", processed = TRUE)
+`,
+    solutionCode: `library(plumber)
+
+#* @apiTitle Production Plumber API
+
+#* @filter logger
+function(req) {
+  forward()
+}
+
+#* @get /data
+#* @serializer json
+function() {
+  list(status = "ok", processed = TRUE)
+}
+`,
+    goal: {
+      endpoints: [{ method: 'GET', path: '/data' }],
+      codeContains: ['#* @filter logger', 'forward()', '#* @get /data', '#* @serializer json'],
+      calls: [
+        { method: 'GET', path: '/data', expectStatus: 200, expectBody: { status: 'ok', processed: true } },
+      ],
+    },
+    startDialog: [
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Plumber Filters & Middleware in R',
+          'Filters declared with `#* @filter` intercept requests before route handlers execute.',
+          'Calling `forward()` hands control down the processing chain to subsequent filters and endpoints.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Under the Hood: Pipeline Interception',
+          'Filters are the ideal vehicle for authentication guards, timing metrics, and CORS header injection in R services.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Code Pattern\n\n```r\n#* @filter logger\nfunction(req) {\n  forward()\n}\n\n#* @get /data\n#* @serializer json\nfunction() {\n  list(status = "ok", processed = TRUE)\n}\n```',
+        ],
+      },
+      { type: 'GoalList' },
+    ],
+  },
 
   // ── OpenAPI ───────────────────────────────────────────
   {
@@ -1283,6 +1706,77 @@ def create_item(item: Item):
         type: 'ModalAlert',
         markdowns: [
           '## Code Pattern\n\n```python\nclass Item(BaseModel):\n    name: str\n\n@app.post("/items", status_code=201)\ndef create_item(item: Item):\n    return {"name": item.name}\n```',
+        ],
+      },
+      { type: 'GoalList' },
+    ],
+  },
+  {
+    id: 'openapi-03',
+    track: 'openapi',
+    language: 'python',
+    name: 'OpenAPI Error Response Contracts',
+    objective: 'Document error response contracts in OpenAPI documentation using explicit HTTPException rules.',
+    pattern: `@app.get("/orders/{order_id}")\ndef get_order(order_id: int):\n    if order_id == 0:\n        raise HTTPException(status_code=404, detail="Order not found")\n    return {"order_id": order_id, "status": "shipped"}`,
+    learning: [
+      'A complete OpenAPI contract documents not only 200 OK successes, but also client error codes (e.g. 404 Not Found, 400 Bad Request).',
+      'FastAPI inspects handler exceptions and status codes, documenting them in the OpenAPI components and paths responses map.',
+      'Comprehensive OpenAPI contracts enable client SDK generators and contract testers (e.g. Schemathesis) to validate edge cases.',
+    ],
+    fieldNotes: [
+      'Document standard error schemas across all microservices conforming to RFC 7807 (Problem Details for HTTP APIs).',
+      'Use contract testing tools in CI/CD pipelines to ensure actual API responses match the published OpenAPI error contracts.',
+      'Explicit error documentation reduces developer support tickets and accelerates third-party integration.',
+    ],
+    hint: 'Define `@app.get("/orders/{order_id}")` with `order_id: int`. If `order_id == 0`, raise `HTTPException(status_code=404, detail="Order not found")`, else return `{"order_id": order_id, "status": "shipped"}`.',
+    golf: 3,
+    editorLabel: 'server.py',
+    startCode: `from fastapi import FastAPI, HTTPException
+
+app = FastAPI(title="Store API")
+
+# TODO: Define @app.get("/orders/{order_id}") with order_id: int
+# If order_id == 0, raise 404 HTTPException, else return {"order_id": order_id, "status": "shipped"}
+`,
+    solutionCode: `from fastapi import FastAPI, HTTPException
+
+app = FastAPI(title="Store API")
+
+@app.get("/orders/{order_id}")
+def get_order(order_id: int):
+    if order_id == 0:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return {"order_id": order_id, "status": "shipped"}
+`,
+    goal: {
+      endpoints: [{ method: 'GET', path: '/orders/{order_id}' }],
+      codeContains: ['@app.get("/orders/{order_id}")', 'order_id: int', 'raise HTTPException(status_code=404'],
+      openapiHas: ['paths./orders/{order_id}.get.responses.404', 'paths./orders/{order_id}.get.parameters'],
+      calls: [
+        { method: 'GET', path: '/orders/12', expectStatus: 200, expectBody: { order_id: 12, status: 'shipped' } },
+        { method: 'GET', path: '/orders/0', expectStatus: 404 },
+      ],
+    },
+    startDialog: [
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Error Response Contracts in OpenAPI',
+          'Production-grade OpenAPI specifications must document potential error states (e.g. 404 Not Found) alongside successful 200 OK responses.',
+          'FastAPI automatically reflects `HTTPException` error codes in the `responses` schema.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Under the Hood: OpenAPI Responses Map',
+          'Declaring potential error paths allows contract testing suites (Schemathesis) and SDK generators to understand error structures.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Code Pattern\n\n```python\n@app.get("/orders/{order_id}")\ndef get_order(order_id: int):\n    if order_id == 0:\n        raise HTTPException(status_code=404, detail="Order not found")\n    return {"order_id": order_id, "status": "shipped"}\n```',
         ],
       },
       { type: 'GoalList' },
