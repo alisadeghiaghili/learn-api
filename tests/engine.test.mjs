@@ -202,6 +202,78 @@ assert(calcRes.status === 200, `calcRes 200 (got ${calcRes.status})`);
 assert(calcRes.body.sum === 35, `calcRes sum 35 (got ${calcRes.body.sum})`);
 assert(calcRes.body.msg === 'sum is 35', `calcRes msg (got ${calcRes.body.msg})`);
 
+// 13. APIRouter prefix and tagging
+const routerApp = parseSource(
+  `
+from fastapi import FastAPI, APIRouter
+
+app = FastAPI(title="Modular")
+router = APIRouter(prefix="/v1/users", tags=["users"])
+
+@router.get("/")
+def list_users():
+    return {"users": ["alice"]}
+
+@router.get("/{user_id}")
+def get_user(user_id: int):
+    return {"id": user_id}
+
+app.include_router(router)
+`,
+  'python'
+);
+const rListRes = executeRequest(routerApp, { method: 'GET', path: '/v1/users' });
+assert(rListRes.status === 200, `APIRouter list 200 (got ${rListRes.status})`);
+assert(rListRes.body.users[0] === 'alice', 'APIRouter list body');
+const rUserRes = executeRequest(routerApp, { method: 'GET', path: '/v1/users/77' });
+assert(rUserRes.status === 200, `APIRouter param 200 (got ${rUserRes.status})`);
+assert(rUserRes.body.id === 77, 'APIRouter param body');
+
+// 14. CORSMiddleware preflight and headers
+const corsApp = parseSource(
+  `
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["*"])
+
+@app.get("/items")
+def items():
+    return {"items": []}
+`,
+  'python'
+);
+assert(corsApp.cors === true, 'CORS detected on parsed app');
+const corsOptions = executeRequest(corsApp, { method: 'OPTIONS', path: '/items' });
+assert(corsOptions.status === 200, `CORS preflight 200 (got ${corsOptions.status})`);
+assert(corsOptions.headers['access-control-allow-origin'] === '*', 'CORS preflight origin header');
+const corsGet = executeRequest(corsApp, { method: 'GET', path: '/items' });
+assert(corsGet.headers['access-control-allow-origin'] === '*', 'CORS GET origin header');
+
+// 15. Reusable security guard with Depends
+const authApp = parseSource(
+  `
+from fastapi import FastAPI, Depends, Header, HTTPException
+
+app = FastAPI()
+
+def get_current_user(token: str = Header(..., alias="Authorization")):
+    if token != "Bearer valid-token":
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return {"username": "bob", "role": "admin"}
+
+@app.get("/secure")
+def secure_route(user: dict = Depends(get_current_user)):
+    return {"user": user.username}
+`,
+  'python'
+);
+const authFail = executeRequest(authApp, { method: 'GET', path: '/secure', headers: { authorization: 'Bearer bad' } });
+assert(authFail.status === 401, `Depends guard fail 401 (got ${authFail.status})`);
+const authPass = executeRequest(authApp, { method: 'GET', path: '/secure', headers: { authorization: 'Bearer valid-token' } });
+assert(authPass.status === 200, `Depends guard pass 200 (got ${authPass.status})`);
+assert(authPass.body.user === 'bob', 'Depends guard user bound');
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

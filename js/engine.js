@@ -441,6 +441,7 @@ export function splitArgs(raw) {
  * @returns {ParsedApp}
  */
 export function parsePython(source) {
+  source = (source || '').replace(/\r\n/g, '\n');
   /** @type {ParsedApp} */
   const app = {
     language: 'python',
@@ -473,22 +474,67 @@ export function parsePython(source) {
       if (!fm) continue;
       const rawType = fm[2].trim();
       const type = rawType.replace(/\[.*$/, '').replace(/\|.*$/, '').trim();
+      const rawDef = fm[3];
+      const isField = rawDef && /Field\s*\(/.test(rawDef);
+      const isEllipsis = isField && /Field\s*\(\s*\.\.\./.test(rawDef);
+      const isRequired = (rawDef === undefined || isEllipsis) && !rawType.includes('None') && !rawType.includes('Optional');
+      let example = undefined;
+      if (rawDef !== undefined && !isEllipsis) {
+        if (isField) {
+          const defaultKw = rawDef.match(/default\s*=\s*([^,\)]+)/);
+          const posVal = rawDef.match(/Field\s*\(\s*([^,\)]+)/);
+          if (defaultKw) {
+            example = parseLiteral(defaultKw[1]);
+          } else if (posVal && !/^\s*\.\.\.\s*$/.test(posVal[1]) && !/gt=|ge=|lt=|le=|min_length=|max_length=/.test(posVal[1])) {
+            example = parseLiteral(posVal[1]);
+          }
+        } else {
+          example = parseLiteral(rawDef);
+        }
+      }
       fields[fm[1]] = {
         type,
-        required: fm[3] === undefined && !rawType.includes('None') && !rawType.includes('Optional'),
-        example: fm[3] !== undefined ? parseLiteral(fm[3]) : undefined,
+        required: isRequired,
+        example,
       };
     }
     app.models[name] = fields;
   }
 
-  // Dependency providers: def get_settings(): return {...}
-  const depRe = /def\s+([A-Za-z_]\w*)\s*\(\s*\)\s*:\n([\s\S]*?)(?=\n@|\ndef\s|\nasync\s|\nclass\s|$)/g;
-  let dm;
-  while ((dm = depRe.exec(source))) {
-    const name = dm[1];
-    const body = dm[2];
-    if (/@app\./.test(source.slice(Math.max(0, dm.index - 80), dm.index))) continue;
+  // Middleware detection (CORS)
+  app.cors = /CORSMiddleware/.test(source) && /add_middleware/.test(source);
+
+  // Routers: router = APIRouter(prefix="/users", tags=["users"])
+  const routers = {
+    app: { prefix: '', tag: null },
+  };
+  const routerRe = /(\w+)\s*=\s*APIRouter\s*\(([^)]*)\)/g;
+  let rtm;
+  while ((rtm = routerRe.exec(source))) {
+    const rName = rtm[1];
+    const rArgs = rtm[2];
+    const pfx = (rArgs.match(/prefix\s*=\s*['"]([^'"]+)['"]/) || [])[1] || '';
+    const tg = (rArgs.match(/tags\s*=\s*\[\s*['"]([^'"]+)['"]\s*\]/) || [])[1] || null;
+    routers[rName] = { prefix: pfx, tag: tg };
+  }
+
+  // Dependency providers: def get_settings(): return {...} or def get_current_user(...): ...
+  app.dependencyFunctions = {};
+  const defMatches = [...source.matchAll(/def\s+([A-Za-z_]\w*)\s*\(/g)];
+  for (const dfm of defMatches) {
+    const name = dfm[1];
+    const parenStart = dfm.index + dfm[0].length - 1;
+    // Check if this def is a route handler preceded by @...
+    const beforeDef = source.slice(Math.max(0, dfm.index - 80), dfm.index);
+    if (/@(app|\w+)\./.test(beforeDef)) continue;
+
+    const paramsBlock = extractBalanced(source, parenStart, '(', ')');
+    const paramsStr = paramsBlock.slice(1, -1);
+    const afterParams = source.slice(parenStart + paramsBlock.length);
+    const bodyM = afterParams.match(/^\s*(?:->\s*[^:]+)?\s*:\n([\s\S]*?)(?=\n@|\ndef\s|\nasync\s|\nclass\s|$)/);
+    if (!bodyM) continue;
+    const body = bodyM[1];
+    app.dependencyFunctions[name] = { name, paramsStr, body };
     const lit = extractReturnLiteral(body);
     if (lit) {
       try {
@@ -499,17 +545,22 @@ export function parsePython(source) {
     }
   }
 
-  // Routes: @app.get(...), @app.post(...)
-  const routeRe = /@app\.(get|post|put|patch|delete)\s*\(\s*(['"])([^'"]+)\2([^)]*)\)/g;
+  // Routes: @app.get(...), @router.get(...)
+  const routeRe = /@(\w+)\.(get|post|put|patch|delete)\s*\(\s*(['"])([^'"]+)\3([^)]*)\)/g;
   let rm;
   while ((rm = routeRe.exec(source))) {
-    const method = rm[1].toUpperCase();
-    const path = normalizePathParams(rm[3]);
-    const args = rm[4] || '';
+    const targetRouter = routers[rm[1]] || { prefix: '', tag: null };
+    const method = rm[2].toUpperCase();
+    const rawSubPath = rm[4];
+    const combinedPath = targetRouter.prefix
+      ? normalizePath(targetRouter.prefix + (rawSubPath === '/' ? '' : '/' + rawSubPath.replace(/^\//, '')))
+      : normalizePathParams(rawSubPath);
+    const path = combinedPath;
+    const args = rm[5] || '';
     const after = source.slice(rm.index + rm[0].length);
     const defHead = after.match(/^\s*(?:async\s+)?def\s+(\w+)\s*\(/);
     if (!defHead) {
-      app.errors.push(`@app.${rm[1]}("${rm[3]}") requires a def handler function.`);
+      app.errors.push(`@${rm[1]}.${rm[2]}("${rm[4]}") requires a def handler function.`);
       continue;
     }
     const handlerName = defHead[1];
@@ -543,6 +594,8 @@ export function parsePython(source) {
     const headers = {};
     /** @type {string[]} */
     const deps = [];
+    /** @type {Record<string, string>} */
+    const depParamMap = {};
     let body = null;
     let bodyModel = null;
 
@@ -561,6 +614,7 @@ export function parsePython(source) {
       const dep = (def || type || '').match(/Depends\s*\(\s*([A-Za-z_][\w]*)\s*\)/);
       if (dep) {
         deps.push(dep[1]);
+        depParamMap[dep[1]] = name;
         continue;
       }
 
@@ -598,8 +652,8 @@ export function parsePython(source) {
         continue;
       }
 
-      if (Object.keys(app.models).includes(type) || /BaseModel|User|Item|Create|Request/.test(type)) {
-        body = { type, required: def === undefined };
+      if (Object.keys(app.models).includes(type) || /BaseModel|User|Item|Create|Request|Product/.test(type)) {
+        body = { type, required: def === undefined, paramName: name };
         bodyModel = type;
       } else {
         const parsedDef = def !== undefined ? parseLiteral(def) : undefined;
@@ -615,7 +669,7 @@ export function parsePython(source) {
     const sc = args.match(/status_code\s*=\s*(\d{3})/);
     if (sc) status = parseInt(sc[1], 10);
     const summary = (args.match(/summary\s*=\s*['"]([^'"]+)['"]/) || [])[1] || null;
-    const tag = (args.match(/tags\s*=\s*\[\s*['"]([^'"]+)['"]\s*\]/) || [])[1] || null;
+    const tag = (args.match(/tags\s*=\s*\[\s*['"]([^'"]+)['"]\s*\]/) || [])[1] || targetRouter.tag || null;
     const responseModel =
       (args.match(/response_model\s*=\s*([A-Za-z_][\w]*)/) || [])[1] || null;
 
@@ -653,9 +707,11 @@ export function parsePython(source) {
       query,
       headers,
       deps,
+      depParamMap,
       raises,
       body,
       bodyModel,
+      bodyParamName: body?.paramName || null,
       responseModel,
     });
   }
@@ -672,6 +728,7 @@ export function parsePython(source) {
  * @returns {ParsedApp}
  */
 export function parseR(source) {
+  source = (source || '').replace(/\r\n/g, '\n');
   /** @type {ParsedApp} */
   const app = {
     language: 'r',
@@ -788,7 +845,7 @@ export function matchRoute(routes, method, path) {
   const normMethod = String(method).toUpperCase();
   const p = normalizePathParams(path.split('?')[0]);
   for (const route of routes) {
-    if (route.method !== normMethod) continue;
+    if (route.method !== normMethod && normMethod !== 'OPTIONS') continue;
     const routeParts = route.path.split('/').filter(Boolean);
     const reqParts = p.split('/').filter(Boolean);
     if (routeParts.length !== reqParts.length) continue;
@@ -852,6 +909,12 @@ export function buildBindings(route, pathParams, query, body, parsedApp, reqHead
     for (const [k, v] of Object.entries(body)) {
       b[k] = v;
       b[`body.${k}`] = v;
+      if (route.bodyParamName) {
+        b[`${route.bodyParamName}.${k}`] = v;
+      }
+    }
+    if (route.bodyParamName) {
+      b[route.bodyParamName] = body;
     }
   }
 
@@ -885,6 +948,25 @@ export function executeRequest(parsed, req) {
   const rawPath = req.path || '/';
   const [pathname, qs] = rawPath.split('?');
 
+  const corsHeaders = parsed.cors ? { 'access-control-allow-origin': '*' } : {};
+
+  // Handle CORS preflight
+  if (parsed.cors && method === 'OPTIONS') {
+    return {
+      status: 200,
+      ok: true,
+      headers: {
+        'content-type': 'application/json',
+        'access-control-allow-origin': '*',
+        'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+        'access-control-allow-headers': '*',
+      },
+      body: { detail: 'CORS preflight successful' },
+      matched: null,
+      params: {},
+    };
+  }
+
   /** @type {Record<string, string>} */
   const query = { ...(req.query || {}) };
   if (qs) {
@@ -902,7 +984,7 @@ export function executeRequest(parsed, req) {
     return {
       status: 404,
       ok: false,
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...corsHeaders },
       body: { detail: `No route for ${method} ${normalizePath(pathname)}` },
       matched: null,
       params: {},
@@ -922,7 +1004,7 @@ export function executeRequest(parsed, req) {
       return {
         status: 401,
         ok: false,
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...corsHeaders },
         body: { detail: `Missing required header ${meta.alias || name}` },
         matched: hit.route,
         params: hit.params,
@@ -938,7 +1020,7 @@ export function executeRequest(parsed, req) {
       return {
         status: 422,
         ok: false,
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...corsHeaders },
         body: {
           detail: [
             {
@@ -957,6 +1039,64 @@ export function executeRequest(parsed, req) {
 
   const bindings = buildBindings(hit.route, hit.params, query, req.body, parsed, reqHeaders);
 
+  // Evaluate custom dependency functions if defined
+  if (parsed.dependencyFunctions && hit.route.deps?.length) {
+    for (const dep of hit.route.deps) {
+      const depFn = parsed.dependencyFunctions[dep];
+      if (depFn) {
+        const depBindings = { ...bindings };
+        if (depFn.paramsStr) {
+          const parts = splitArgs(depFn.paramsStr);
+          for (const p of parts) {
+            const m = p.match(/^\s*(\w+)\s*(?::\s*([^=]+?))?\s*(?:=\s*(.+))?$/s);
+            if (!m) continue;
+            const pName = m[1];
+            const pType = m[2];
+            const pDef = m[3];
+            const isHdr = /Header\b/.test(pType || '') || /Header\b/.test(pDef || '');
+            if (isHdr) {
+              let alias = pName.replace(/_/g, '-');
+              const aliasMatch = (pDef || '').match(/alias\s*=\s*['"]([^'"]+)['"]/);
+              const positionalStr = (pDef || '').match(/Header\s*\(\s*['"]([^'"]+)['"]/);
+              if (aliasMatch) alias = aliasMatch[1];
+              else if (positionalStr && !/Header\s*\(\s*['"][^'"]*['"]\s*,\s*alias\s*=/.test(pDef || '')) {
+                alias = positionalStr[1];
+              }
+              const hdrVal = reqHeaders[alias.toLowerCase()] ?? reqHeaders[pName.toLowerCase()];
+              if (hdrVal !== undefined) {
+                depBindings[pName] = hdrVal;
+              }
+            }
+          }
+        }
+        const depRes = evaluateHandler(depFn.body, depBindings);
+        if (depRes.earlyReturn) {
+          return {
+            status: depRes.earlyReturn.status,
+            ok: false,
+            headers: { 'content-type': 'application/json', ...corsHeaders },
+            body: { detail: depRes.earlyReturn.detail },
+            matched: hit.route,
+            params: hit.params,
+            error: 'http_exception',
+          };
+        }
+        if (depRes.bound !== undefined) {
+          const paramName = hit.route.depParamMap?.[dep] || dep;
+          bindings[dep] = depRes.bound;
+          bindings[paramName] = depRes.bound;
+          if (typeof depRes.bound === 'object' && depRes.bound !== null) {
+            for (const [k, v] of Object.entries(depRes.bound)) {
+              bindings[`${paramName}.${k}`] = v;
+              bindings[`${dep}.${k}`] = v;
+              bindings[k] = v;
+            }
+          }
+        }
+      }
+    }
+  }
+
   // Check explicit raises rules
   for (const rule of hit.route.raises || []) {
     if (rule.ifParam === undefined) continue;
@@ -970,7 +1110,7 @@ export function executeRequest(parsed, req) {
       return {
         status: rule.status,
         ok: false,
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...corsHeaders },
         body: { detail: rule.detail || 'error' },
         matched: hit.route,
         params: hit.params,
@@ -985,7 +1125,7 @@ export function executeRequest(parsed, req) {
     return {
       status: evalResult.earlyReturn.status,
       ok: false,
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...corsHeaders },
       body: { detail: evalResult.earlyReturn.detail },
       matched: hit.route,
       params: hit.params,
@@ -997,7 +1137,7 @@ export function executeRequest(parsed, req) {
   return {
     status,
     ok: status >= 200 && status < 300,
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...corsHeaders },
     body: evalResult.bound === null ? null : evalResult.bound,
     matched: hit.route,
     params: hit.params,

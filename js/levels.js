@@ -1263,6 +1263,453 @@ def compute(x_rate_limit: int = Header(10, alias="X-Rate-Limit")):
       { type: 'GoalList' },
     ],
   },
+  {
+    id: 'fastapi-14',
+    track: 'fastapi',
+    language: 'python',
+    name: 'Field Validation & Constraints',
+    objective: 'Enforce strict schema constraints using Pydantic Field specifications (min_length, gt) on incoming models.',
+    pattern: `class Product(BaseModel):\n    name: str = Field(..., min_length=2)\n    price: float = Field(gt=0)\n    tag: str = "general"\n\n@app.post("/products", status_code=201)\ndef create_product(product: Product):\n    return {"name": product.name, "price": product.price, "tag": product.tag}`,
+    learning: [
+      'Pydantic Field(...) declares granular schema constraints (min_length, max_length, gt, lt) directly on model attributes.',
+      'Under the hood: FastAPI compiles Field rules into OpenAPI schema constraints and produces RFC 7807 422 errors on invalid data.',
+      'An ellipsis (...) as the first argument indicates that the attribute is required despite explicit constraint settings.',
+    ],
+    fieldNotes: [
+      'Enforce positive numeric limits (gt=0) at the API boundary to prevent corrupt prices or inventory counts.',
+      'Field constraints populate OpenAPI metadata, ensuring auto-generated TypeScript and SDK clients enforce identical bounds.',
+      'Combine min_length and regex validation to sanitize and format SKUs, slugs, and usernames.',
+    ],
+    hint: 'Define `class Product(BaseModel)` with `name: str = Field(..., min_length=2)`, `price: float = Field(gt=0)`, and `tag: str = "general"`, then handle POST /products returning status 201.',
+    golf: 3,
+    editorLabel: 'main.py',
+    startCode: `from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI(title="Catalog API")
+
+# TODO: Define class Product(BaseModel) with:
+#   name: str with Field(..., min_length=2)
+#   price: float with Field(gt=0)
+#   tag: str = "general"
+
+# TODO: Define @app.post("/products", status_code=201)
+#   accepting product: Product and returning {"name": product.name, "price": product.price, "tag": product.tag}
+`,
+    solutionCode: `from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+app = FastAPI(title="Catalog API")
+
+class Product(BaseModel):
+    name: str = Field(..., min_length=2)
+    price: float = Field(gt=0)
+    tag: str = "general"
+
+@app.post("/products", status_code=201)
+def create_product(product: Product):
+    return {"name": product.name, "price": product.price, "tag": product.tag}
+`,
+    goal: {
+      endpoints: [{ method: 'POST', path: '/products', status: 201 }],
+      codeContains: ['Field(', 'min_length=', 'gt='],
+      calls: [
+        {
+          method: 'POST',
+          path: '/products',
+          body: { name: 'Keyboard', price: 79.99, tag: 'hardware' },
+          expectStatus: 201,
+          expectBody: { name: 'Keyboard', price: 79.99, tag: 'hardware' },
+        },
+      ],
+    },
+    startDialog: [
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Schema Constraints with Pydantic Field',
+          'Basic type annotations verify types, but robust APIs require granular domain constraints like string lengths and positive numerical values.',
+          'Pydantic `Field(...)` equips attributes with boundary rules before handler code executes.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Under the Hood: OpenAPI & Validation Pipeline',
+          'FastAPI automatically extracts `min_length` and `gt` constraints into the OpenAPI JSON Schema.',
+          'Clients sending invalid values immediately receive HTTP 422 Unprocessable Entity with detailed violation pointers.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Code Pattern\n\n```python\nclass Product(BaseModel):\n    name: str = Field(..., min_length=2)\n    price: float = Field(gt=0)\n    tag: str = "general"\n\n@app.post("/products", status_code=201)\ndef create_product(product: Product):\n    return {"name": product.name, "price": product.price, "tag": product.tag}\n```',
+        ],
+      },
+      { type: 'GoalList' },
+    ],
+  },
+  {
+    id: 'fastapi-15',
+    track: 'fastapi',
+    language: 'python',
+    name: 'Partial Updates: PUT vs PATCH',
+    objective: 'Implement RFC 5789 partial resource modification with HTTP PATCH and dedicated partial models.',
+    pattern: `class ItemPatch(BaseModel):\n    title: str = "patched_title"\n\n@app.patch("/items/{item_id}")\ndef patch_item(item_id: int, item: ItemPatch):\n    return {"id": item_id, "title": item.title, "mode": "partial"}`,
+    learning: [
+      'RFC 9110 PUT replaces an entire resource; RFC 5789 PATCH applies delta updates to modified fields.',
+      'Under the hood: PATCH handlers update only fields explicitly supplied in the request body, preventing accidental clobbering.',
+      'Using PATCH reduces payload sizes and minimizes concurrency hazards in high-throughput collaborative systems.',
+    ],
+    fieldNotes: [
+      'Strictly separate full replacements (PUT) from delta mutations (PATCH) to maintain standard REST semantics.',
+      'In production, use Optional attributes with default None and model_dump(exclude_unset=True) to merge updates.',
+      'Protect read-only attributes (e.g., createdAt, id) by excluding them from PATCH input models entirely.',
+    ],
+    hint: 'Define `class ItemPatch(BaseModel)` with `title: str = "patched_title"`, then write `@app.patch("/items/{item_id}")` returning `{"id": item_id, "title": item.title, "mode": "partial"}`.',
+    golf: 3,
+    editorLabel: 'main.py',
+    startCode: `from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI(title="Inventory API")
+
+# TODO: Define class ItemPatch(BaseModel) with title: str = "patched_title"
+# TODO: Define @app.patch("/items/{item_id}")
+#   accepting item_id: int, item: ItemPatch
+#   returning {"id": item_id, "title": item.title, "mode": "partial"}
+`,
+    solutionCode: `from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI(title="Inventory API")
+
+class ItemPatch(BaseModel):
+    title: str = "patched_title"
+
+@app.patch("/items/{item_id}")
+def patch_item(item_id: int, item: ItemPatch):
+    return {"id": item_id, "title": item.title, "mode": "partial"}
+`,
+    goal: {
+      endpoints: [{ method: 'PATCH', path: '/items/{item_id}', status: 200 }],
+      codeContains: ['@app.patch("/items/{item_id}")', 'class ItemPatch(BaseModel):'],
+      calls: [
+        {
+          method: 'PATCH',
+          path: '/items/42',
+          body: { title: 'desk' },
+          expectStatus: 200,
+          expectBody: { id: 42, title: 'desk', mode: 'partial' },
+        },
+      ],
+    },
+    startDialog: [
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Partial Resource Modification with HTTP PATCH',
+          'While PUT completely overwrites an entire entity, HTTP PATCH (RFC 5789) updates only the specific fields provided by the caller.',
+          'This prevents race conditions where a client unintentionally resets fields it did not intend to touch.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Under the Hood: Delta Modification Mechanics',
+          'In production systems, handlers inspect received attributes and selectively update database columns.',
+          'FastAPI supports PATCH routes using the dedicated `@app.patch` decorator.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Code Pattern\n\n```python\nclass ItemPatch(BaseModel):\n    title: str = "patched_title"\n\n@app.patch("/items/{item_id}")\ndef patch_item(item_id: int, item: ItemPatch):\n    return {"id": item_id, "title": item.title, "mode": "partial"}\n```',
+        ],
+      },
+      { type: 'GoalList' },
+    ],
+  },
+  {
+    id: 'fastapi-16',
+    track: 'fastapi',
+    language: 'python',
+    name: 'Reusable Auth Guards with Depends',
+    objective: 'Enforce decoupled authentication pipelines using reusable dependency functions and Header extraction.',
+    pattern: `def get_current_user(token: str = Header(..., alias="Authorization")):\n    if token != "Bearer secret-123":\n        raise HTTPException(status_code=401, detail="Unauthorized")\n    return {"username": "alice", "role": "admin"}\n\n@app.get("/me")\ndef read_me(current_user: dict = Depends(get_current_user)):`,
+    learning: [
+      'FastAPI Depends injection decouples security logic, token extraction, and permission checks from route handlers.',
+      'Under the hood: When a request arrives, dependency functions execute first; if an exception is raised, execution aborts before reaching the handler.',
+      'Dependency return values are automatically passed into route handler parameters as strongly-typed objects.',
+    ],
+    fieldNotes: [
+      'Centralize authentication, token parsing, and role verification in reusable dependencies across all endpoints.',
+      'Using Depends makes unit testing straightforward: swap auth providers in tests using app.dependency_overrides.',
+      'Avoid duplicate authorization checks inside route handlers; security belongs in centralized dependency guards.',
+    ],
+    hint: 'Write `def get_current_user(token: str = Header(..., alias="Authorization"))` verifying "Bearer secret-123", then inject it into `@app.get("/me")` with `Depends(get_current_user)`.',
+    golf: 4,
+    editorLabel: 'auth.py',
+    startCode: `from fastapi import FastAPI, Depends, Header, HTTPException
+
+app = FastAPI(title="Security API")
+
+# TODO: Define def get_current_user(token: str = Header(..., alias="Authorization")):
+#   if token != "Bearer secret-123":
+#       raise HTTPException(status_code=401, detail="Unauthorized")
+#   return {"username": "alice", "role": "admin"}
+
+# TODO: Define @app.get("/me")
+#   accepting current_user: dict = Depends(get_current_user)
+#   returning {"user": current_user.username, "role": current_user.role}
+`,
+    solutionCode: `from fastapi import FastAPI, Depends, Header, HTTPException
+
+app = FastAPI(title="Security API")
+
+def get_current_user(token: str = Header(..., alias="Authorization")):
+    if token != "Bearer secret-123":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return {"username": "alice", "role": "admin"}
+
+@app.get("/me")
+def read_me(current_user: dict = Depends(get_current_user)):
+    return {"user": current_user.username, "role": current_user.role}
+`,
+    goal: {
+      endpoints: [{ method: 'GET', path: '/me', status: 200 }],
+      codeContains: ['def get_current_user', 'Depends(get_current_user)', 'alias="Authorization"'],
+      calls: [
+        {
+          method: 'GET',
+          path: '/me',
+          headers: { authorization: 'Bearer secret-123' },
+          expectStatus: 200,
+          expectBody: { user: 'alice', role: 'admin' },
+        },
+        {
+          method: 'GET',
+          path: '/me',
+          headers: { authorization: 'Bearer wrong' },
+          expectStatus: 401,
+        },
+      ],
+    },
+    startDialog: [
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Decoupled Security Guards with Depends',
+          'Embedding authorization checks inside every route handler creates boilerplate and security anti-patterns.',
+          'Using FastAPI `Depends(get_current_user)` isolates authentication into reusable, composable security guards.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Under the Hood: Dependency Execution Order',
+          'FastAPI evaluates the dependency graph before calling the route function.',
+          'If the dependency raises an `HTTPException`, the framework immediately halts and sends the error response, protecting downstream code.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Code Pattern\n\n```python\ndef get_current_user(token: str = Header(..., alias="Authorization")):\n    if token != "Bearer secret-123":\n        raise HTTPException(status_code=401, detail="Unauthorized")\n    return {"username": "alice", "role": "admin"}\n\n@app.get("/me")\ndef read_me(current_user: dict = Depends(get_current_user)):\n    return {"user": current_user.username, "role": current_user.role}\n```',
+        ],
+      },
+      { type: 'GoalList' },
+    ],
+  },
+  {
+    id: 'fastapi-17',
+    track: 'fastapi',
+    language: 'python',
+    name: 'Modular Architecture with APIRouter',
+    objective: 'Decompose monolithic APIs into modular sub-routers with path prefixes and OpenAPI tags.',
+    pattern: `router = APIRouter(prefix="/users", tags=["users"])\n@router.get("/")\napp.include_router(router)`,
+    learning: [
+      'APIRouter structures large backends into isolated domain modules (users, orders, billing) rather than a giant server file.',
+      'Under the hood: app.include_router registers sub-router routes, prepending path prefixes and attaching OpenAPI tags.',
+      'Modular routers promote team ownership, clean separation of concerns, and clean Swagger documentation groupings.',
+    ],
+    fieldNotes: [
+      'Organize each domain in its own submodule (e.g. routers/users.py) and export its APIRouter instance.',
+      'Sub-routers can define router-level dependencies that apply automatically across all attached endpoints.',
+      'Never duplicate route prefixes in individual route decorators; configure prefix once at the router declaration.',
+    ],
+    hint: 'Define `router = APIRouter(prefix="/users", tags=["users"])`, declare `@router.get("/")` and `@router.get("/{user_id}")`, and call `app.include_router(router)`.',
+    golf: 4,
+    editorLabel: 'routers.py',
+    startCode: `from fastapi import FastAPI, APIRouter
+
+app = FastAPI(title="Modular API")
+
+# TODO: Define router = APIRouter(prefix="/users", tags=["users"])
+# TODO: Define @router.get("/") returning {"users": ["alice", "bob"]}
+# TODO: Define @router.get("/{user_id}") accepting user_id: int returning {"id": user_id, "name": "alice"}
+# TODO: Call app.include_router(router)
+`,
+    solutionCode: `from fastapi import FastAPI, APIRouter
+
+app = FastAPI(title="Modular API")
+router = APIRouter(prefix="/users", tags=["users"])
+
+@router.get("/")
+def list_users():
+    return {"users": ["alice", "bob"]}
+
+@router.get("/{user_id}")
+def get_user(user_id: int):
+    return {"id": user_id, "name": "alice"}
+
+app.include_router(router)
+`,
+    goal: {
+      endpoints: [
+        { method: 'GET', path: '/users', status: 200 },
+        { method: 'GET', path: '/users/{user_id}', status: 200 },
+      ],
+      codeContains: [
+        'APIRouter(prefix="/users"',
+        'app.include_router(router)',
+        '@router.get("/")',
+        '@router.get("/{user_id}")',
+      ],
+      calls: [
+        {
+          method: 'GET',
+          path: '/users',
+          expectStatus: 200,
+          expectBody: { users: ['alice', 'bob'] },
+        },
+        {
+          method: 'GET',
+          path: '/users/42',
+          expectStatus: 200,
+          expectBody: { id: 42, name: 'alice' },
+        },
+      ],
+    },
+    startDialog: [
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Modular API Architectures with APIRouter',
+          'Monolithic single-file APIs quickly become unmaintainable as endpoints grow.',
+          '`APIRouter` enables modular splitting of endpoints into dedicated domain files with shared prefixes and tags.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Under the Hood: Prefix Merging & Swagger Tagging',
+          'When calling `app.include_router(router)`, the root application merges the sub-router route tree.',
+          'All routes gain the configured prefix (e.g., `/users`) and appear grouped under the specified tag in Swagger UI.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Code Pattern\n\n```python\nrouter = APIRouter(prefix="/users", tags=["users"])\n\n@router.get("/")\ndef list_users():\n    return {"users": ["alice", "bob"]}\n\n@router.get("/{user_id}")\ndef get_user(user_id: int):\n    return {"id": user_id, "name": "alice"}\n\napp.include_router(router)\n```',
+        ],
+      },
+      { type: 'GoalList' },
+    ],
+  },
+  {
+    id: 'fastapi-18',
+    track: 'fastapi',
+    language: 'python',
+    name: 'CORS & Cross-Origin Middleware',
+    objective: 'Configure CORSMiddleware to allow safe browser client cross-origin requests and preflight options.',
+    pattern: `app.add_middleware(\n    CORSMiddleware,\n    allow_origins=["*"],\n    allow_methods=["*"],\n    allow_headers=["*"],\n)`,
+    learning: [
+      'Browsers enforce the Same-Origin Policy (SOP); web apps on external domains cannot fetch API resources without CORS headers.',
+      'Under the hood: CORSMiddleware intercepts requests, handles preflight OPTIONS checks, and injects Access-Control-Allow-* headers.',
+      'Production APIs restrict allow_origins to trusted client domain names rather than wildcard ("*") when handling credentials.',
+    ],
+    fieldNotes: [
+      'Preflight checks use the HTTP OPTIONS method to verify server acceptance before state-changing mutations execute.',
+      'When credentials (cookies/auth headers) are sent, browsers disallow wildcard "*" origins for security.',
+      'Place CORSMiddleware at the outermost layer of your application pipeline so preflight OPTIONS requests succeed instantly.',
+    ],
+    hint: 'Add `CORSMiddleware` using `app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])` and define `@app.get("/data")`.',
+    golf: 3,
+    editorLabel: 'server.py',
+    startCode: `from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI(title="Cross-Origin API")
+
+# TODO: Call app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
+# TODO: Define @app.get("/data") returning {"cors": "enabled"}
+`,
+    solutionCode: `from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI(title="Cross-Origin API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/data")
+def get_data():
+    return {"cors": "enabled"}
+`,
+    goal: {
+      endpoints: [{ method: 'GET', path: '/data', status: 200 }],
+      codeContains: ['CORSMiddleware', 'app.add_middleware', 'allow_origins='],
+      calls: [
+        {
+          method: 'OPTIONS',
+          path: '/data',
+          expectStatus: 200,
+        },
+        {
+          method: 'GET',
+          path: '/data',
+          expectStatus: 200,
+          expectBody: { cors: 'enabled' },
+        },
+      ],
+    },
+    startDialog: [
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Cross-Origin Resource Sharing (CORS)',
+          'When modern frontend apps (React, Vue, mobile web) run on a different origin than the API, web browsers block network requests by default.',
+          'CORS headers inform the browser that cross-origin communication is permitted.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Under the Hood: Preflight OPTIONS Requests',
+          'Browsers send an initial preflight `OPTIONS` request before complex requests (POST with JSON, custom headers).',
+          '`CORSMiddleware` answers preflight requests and appends `Access-Control-Allow-Origin` headers to all responses.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Code Pattern\n\n```python\napp.add_middleware(\n    CORSMiddleware,\n    allow_origins=["*"],\n    allow_methods=["*"],\n    allow_headers=["*"],\n)\n\n@app.get("/data")\ndef get_data():\n    return {"cors": "enabled"}\n```',
+        ],
+      },
+      { type: 'GoalList' },
+    ],
+  },
 
   // ── plumber (R) ───────────────────────────────────────
   {
@@ -1554,6 +2001,81 @@ function() {
         type: 'ModalAlert',
         markdowns: [
           '## Code Pattern\n\n```r\n#* @filter logger\nfunction(req) {\n  forward()\n}\n\n#* @get /data\n#* @serializer json\nfunction() {\n  list(status = "ok", processed = TRUE)\n}\n```',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'plumber-05',
+    track: 'plumber',
+    language: 'r',
+    name: 'Model Serving & Prediction',
+    objective: 'Expose statistical and machine learning model scoring endpoints via Plumber POST handler.',
+    pattern: `#* @post /predict\n#* @serializer json\nfunction(req) {\n  list(prediction = 85.5, status = "scored")\n}`,
+    learning: [
+      'Plumber turns R statistical models (tidymodels, glm, randomForest) into production microservices for scoring.',
+      'Under the hood: Prediction endpoints accept feature payloads via POST, pass them to predict(), and serialize numeric output.',
+      'The @serializer json annotation ensures predictions return as standard JSON numeric primitives instead of R vectors.',
+    ],
+    fieldNotes: [
+      'Load trained model artifacts (readRDS("model.rds")) once at script startup rather than inside each request handler.',
+      'Validate input features against expected types and schemas before feeding them to model matrices to prevent runtime crashes.',
+      'Use batch scoring where feasible: accepting an array of feature rows amortizes inference overhead across requests.',
+    ],
+    hint: 'Annotate with `#* @post /predict` and `#* @serializer json`, then return `list(prediction = 85.5, status = "scored")`.',
+    golf: 3,
+    editorLabel: 'model_api.R',
+    startCode: `library(plumber)
+
+#* @apiTitle ML Scoring Service
+
+# TODO: Define #* @post /predict
+# TODO: Define #* @serializer json
+# TODO: Define function(req) returning list(prediction = 85.5, status = "scored")
+`,
+    solutionCode: `library(plumber)
+
+#* @apiTitle ML Scoring Service
+
+#* @post /predict
+#* @serializer json
+function(req) {
+  list(prediction = 85.5, status = "scored")
+}
+`,
+    goal: {
+      endpoints: [{ method: 'POST', path: '/predict', status: 200 }],
+      codeContains: ['#* @post /predict', '#* @serializer json', 'list(prediction = 85.5'],
+      calls: [
+        {
+          method: 'POST',
+          path: '/predict',
+          expectStatus: 200,
+          expectBody: { prediction: 85.5, status: 'scored' },
+        },
+      ],
+    },
+    startDialog: [
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Model Serving & Predictions in R',
+          'R excels at statistical modeling and machine learning. Plumber transforms trained models into production scoring APIs.',
+          'Scoring endpoints typically use HTTP POST to receive feature sets in the request body.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Under the Hood: Serialization & Model Lifecycle',
+          'Trained model weights remain resident in process memory for microsecond scoring.',
+          'The `#* @serializer json` tag directs Plumber to convert native R output into standard JSON.',
+        ],
+      },
+      {
+        type: 'ModalAlert',
+        markdowns: [
+          '## Code Pattern\n\n```r\n#* @post /predict\n#* @serializer json\nfunction(req) {\n  list(prediction = 85.5, status = "scored")\n}\n```',
         ],
       },
       { type: 'GoalList' },

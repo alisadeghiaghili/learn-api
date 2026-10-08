@@ -758,5 +758,184 @@ export const DE_DIALOGS = {
       ],
     ],
   },
+
+  'fastapi-14': {
+    intro: [
+      '## Erweiterte Modellvalidierung mit Pydantic Field',
+      'Grundtypen wie `str` oder `float` prüfen lediglich den Typ. Enterprise-APIs erfordern jedoch Beschränkungen wie Mindestlängen oder positive Zahlen.',
+      'Pydantic `Field(...)` erzwingt diese Domänenregeln automatisch vor Ausführung des Handlers.',
+    ],
+    slides: [
+      [
+        '## Deklaration von Validierungsregeln',
+        'Parameter wie `min_length` und `gt` (greater than) weisen ungültige Eingaben sofort an der API-Grenze ab, bevor sie die Datenbank erreichen.',
+      ],
+      [
+        '## JSON-Schema-Kompilierung und 422-Fehler',
+        'FastAPI übernimmt Field-Regeln in die OpenAPI-Metadaten. Bei Nichteinhaltung wird HTTP 422 mit exakten Fehlerhinweisen zurückgegeben.',
+      ],
+      [
+        '## Standard-Codemuster',
+        '```python\n' +
+        'class Product(BaseModel):\n' +
+        '    name: str = Field(..., min_length=2)\n' +
+        '    price: float = Field(gt=0)\n' +
+        '    tag: str = "general"\n\n' +
+        '@app.post("/products", status_code=201)\n' +
+        'def create_product(product: Product):\n' +
+        '    return {"name": product.name, "price": product.price, "tag": product.tag}\n' +
+        '```',
+      ],
+    ],
+  },
+
+  'fastapi-15': {
+    intro: [
+      '## Partielle Ressourcenmodifikation: PUT vs. PATCH',
+      'Während PUT eine Ressource vollständig überschreibt, ändert HTTP PATCH (RFC 5789) nur die übermittelten Felder.',
+      'Dies verhindert Race Conditions und Datenverlust bei gleichzeitigen Bearbeitungen.',
+    ],
+    slides: [
+      [
+        '## Vollständiger Ersatz vs. Delta-Mutation',
+        'PUT ist idempotent und ersetzt die gesamte Entität. PATCH wendet inkrementelle Delta-Aktualisierungen an.',
+      ],
+      [
+        '## Netzwerkoptimierung & Concurrency',
+        'Clients senden bei PATCH nur modifizierte Attribute. Das reduziert Bandbreite und schützt unbeteiligte Felder vor versehentlichem Überschreiben.',
+      ],
+      [
+        '## Standard-Codemuster',
+        '```python\n' +
+        'class ItemPatch(BaseModel):\n' +
+        '    title: str = "patched_title"\n\n' +
+        '@app.patch("/items/{item_id}")\n' +
+        'def patch_item(item_id: int, item: ItemPatch):\n' +
+        '    return {"id": item_id, "title": item.title, "mode": "partial"}\n' +
+        '```',
+      ],
+    ],
+  },
+
+  'fastapi-16': {
+    intro: [
+      '## Wiederverwendbare Sicherheits-Guards mit Depends',
+      'Authentifizierungsprüfungen in jedem einzelnen Endpoint erzeugen Redundanz und Sicherheitsrisiken.',
+      'Mit `Depends` werden Sicherheitsüberprüfungen in eigenständige, wiederverwendbare Guards ausgelagert.',
+    ],
+    slides: [
+      [
+        '## Entkoppelte Authentifizierungsschicht',
+        'Dependency-Provider prüfen Request-Header (z. B. Authorization) und werfen bei ungültigen Tokens sofort einen 401-Fehler.',
+      ],
+      [
+        '## Ausführungsreihenfolge im Dependency-Graph',
+        'Der Handler wird erst ausgeführt, wenn alle Abhängigkeiten erfolgreich aufgelöst und validiert wurden.',
+      ],
+      [
+        '## Standard-Codemuster',
+        '```python\n' +
+        'def get_current_user(token: str = Header(..., alias="Authorization")):\n' +
+        '    if token != "Bearer secret-123":\n' +
+        '        raise HTTPException(status_code=401, detail="Unauthorized")\n' +
+        '    return {"username": "alice", "role": "admin"}\n\n' +
+        '@app.get("/me")\n' +
+        'def read_me(current_user: dict = Depends(get_current_user)):\n' +
+        '    return {"user": current_user.username, "role": current_user.role}\n' +
+        '```',
+      ],
+    ],
+  },
+
+  'fastapi-17': {
+    intro: [
+      '## Modulare Architektur mit APIRouter',
+      'Mit wachsender Anzahl von Endpoints wird eine einzige Serverdatei unübersichtlich. `APIRouter` strukturiert Backends in Domänenmodule.',
+      'Jeder Router verwaltet eigene Pfad-Präfixe und Swagger-Tags.',
+    ],
+    slides: [
+      [
+        '## Trennung fachlicher Domänen',
+        'Teile Routen in separate Module (users, orders, billing) auf und binde sie mit `include_router` in die Hauptanwendung ein.',
+      ],
+      [
+        '## Automatische Präfix- und Tag-Vererbung',
+        'Routen im Router benötigen kein wiederholtes Präfix und werden in Swagger UI übersichtlich gruppiert dargestellt.',
+      ],
+      [
+        '## Standard-Codemuster',
+        '```python\n' +
+        'router = APIRouter(prefix="/users", tags=["users"])\n\n' +
+        '@router.get("/")\n' +
+        'def list_users():\n' +
+        '    return {"users": ["alice", "bob"]}\n\n' +
+        '@router.get("/{user_id}")\n' +
+        'def get_user(user_id: int):\n' +
+        '    return {"id": user_id, "name": "alice"}\n\n' +
+        'app.include_router(router)\n' +
+        '```',
+      ],
+    ],
+  },
+
+  'fastapi-18': {
+    intro: [
+      '## Cross-Origin Resource Sharing mit CORSMiddleware',
+      'Webbrowser blockieren aus Sicherheitsgründen standardmäßig API-Anfragen zwischen unterschiedlichen Domains.',
+      'Über `CORSMiddleware` teilt das Backend dem Browser mit, welche Frontend-Clients Zugriff erhalten.',
+    ],
+    slides: [
+      [
+        '## Same-Origin Policy (SOP)',
+        'React- oder Vue-Apps, die auf anderen Ports oder Domains laufen, können ohne CORS-Header keine API-Daten abrufen.',
+      ],
+      [
+        '## Preflight-OPTIONS-Prüfungen',
+        'Vor komplexen Anfragen sendet der Browser einen OPTIONS-Request, um erlaubte HTTP-Methoden und Header abzufragen.',
+      ],
+      [
+        '## Standard-Codemuster',
+        '```python\n' +
+        'app.add_middleware(\n' +
+        '    CORSMiddleware,\n' +
+        '    allow_origins=["*"],\n' +
+        '    allow_methods=["*"],\n' +
+        '    allow_headers=["*"],\n' +
+        ')\n\n' +
+        '@app.get("/data")\n' +
+        'def get_data():\n' +
+        '    return {"cors": "enabled"}\n' +
+        '```',
+      ],
+    ],
+  },
+
+  'plumber-05': {
+    intro: [
+      '## Model Serving & Vorhersage-Pipelines in R',
+      'R ist hervorragend für Statistik und Data Science geeignet. Plumber verwandelt trainierte Modelle in einsatzbereite Microservices.',
+      'Scoring-Endpoints nutzen in der Regel HTTP POST zur Übermittlung von Merkmalsdaten.',
+    ],
+    slides: [
+      [
+        '## Machine-Learning-Scoring in Produktion',
+        'Modelle verbleiben im Arbeitsspeicher und berechnen Vorhersagen in Millisekunden über `predict()`.',
+      ],
+      [
+        '## Standardisierte JSON-Serialisierung',
+        'Die Annotation `#* @serializer json` gewährleistet, dass R-Objekte als sauberes JSON an Clients ausgeliefert werden.',
+      ],
+      [
+        '## Standard-Codemuster',
+        '```r\n' +
+        '#* @post /predict\n' +
+        '#* @serializer json\n' +
+        'function(req) {\n' +
+        '  list(prediction = 85.5, status = "scored")\n' +
+        '}\n' +
+        '```',
+      ],
+    ],
+  },
 };
 

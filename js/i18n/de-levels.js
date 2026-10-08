@@ -380,5 +380,95 @@ export const DE_LEVELS = {
       'Präzise Fehlerverträge beschleunigen die Frontend-Integration und senken Supportanfragen signifikant.',
     ],
   },
+  'fastapi-14': {
+    name: 'Feldvalidierung & Schema-Constraints mit Pydantic',
+    objective: 'Erzwinge strenge Validierungsregeln im Request-Body über Pydantic Field (z. B. min_length, gt).',
+    hint: 'Definiere `Product(BaseModel)` mit `name: str = Field(..., min_length=2)`, `price: float = Field(gt=0)` und `tag: str = "general"`, dann behandle POST /products mit Status 201.',
+    learning: [
+      'Pydantic `Field(...)` definiert feingranulare Beschränkungen (Mindestlänge, Regex, numerische Schranken) direkt am Attribut.',
+      'Interna: FastAPI kompiliert Field-Regeln in OpenAPI JSON Schema und liefert bei Verletzungen RFC 7807 422 Validierungsfehler.',
+      'Die Ellipse (...) als erstes Argument deklariert das Feld trotz zusätzlicher Metadaten als zwingend erforderlich.',
+    ],
+    fieldNotes: [
+      'Setze Grenzwerte (gt=0 für Preise) an der API-Grenze durch, um korrupte Zustände in der Datenbank zu verhindern.',
+      'Field-Constraints synchronisieren OpenAPI-Spezifikationen automatisch mit generierten Frontend-TypeScript-Typen.',
+      'Kombiniere min_length und Regex zur Validierung von Artikelnummern (SKUs) und Benutzernamen.',
+    ],
+  },
+  'fastapi-15': {
+    name: 'Partielle Updates: PUT vs. PATCH',
+    objective: 'Implementiere partielle Entitätsänderungen nach RFC 5789 via HTTP PATCH und dediziertem Patch-Modell.',
+    hint: 'Definiere `ItemPatch(BaseModel)` mit `title: str = "patched_title"` und erstelle Route `@app.patch("/items/{item_id}")` mit partieller Antwort.',
+    learning: [
+      'RFC 9110 PUT ersetzt die gesamte Ressource; RFC 5789 PATCH wendet Delta-Änderungen nur auf übergebene Felder an.',
+      'Interna: In Produktionssystemen überschreiben PATCH-Handler nur vorhandene Nicht-Null-Werte via model_dump(exclude_unset=True).',
+      'PATCH reduziert die Netzwerklast und verhindert versehentliches Überschreiben unbeteiligter Attribute durch parallele Clients.',
+    ],
+    fieldNotes: [
+      'Halte den Unterschied zwischen PUT (vollständiger Ersatz) und PATCH (partielle Mutation) im REST-Design strikt ein.',
+      'Verwende optionale Typen mit Standardwert None, um weggelassene Felder von expliziten Null-Werten zu unterscheiden.',
+      'Schütze unveränderliche Attribute (z. B. Erstellungsdatum, ID) durch Ausschluss aus dem PATCH-Eingabeschema.',
+    ],
+  },
+  'fastapi-16': {
+    name: 'Wiederverwendbare Auth-Guards mit Depends',
+    objective: 'Entkopple Authentifizierungs- und Token-Prüfungen über wiederverwendbare Dependency-Funktionen in FastAPI.',
+    hint: 'Erstelle `def get_current_user(token: str = Header(..., alias="Authorization"))` mit 401-Prüfung und injiziere sie in /me via `Depends(get_current_user)`.',
+    learning: [
+      'Das `Depends`-System von FastAPI entkoppelt Sicherheitsprüfungen und Token-Validierungen von der eigentlichen Endpoint-Logik.',
+      'Interna: Bei Anfragen werden Abhängigkeiten vor dem Handler ausgewertet; bei einer HTTPException bricht der Request sofort ab.',
+      'Rückgabewerte der Dependency werden typsicher als Parameter in den Route-Handler injiziert.',
+    ],
+    fieldNotes: [
+      'Zentralisiere Authentifizierung, JWT-Parsing und Rollenprüfungen in wiederverwendbaren Abhängigkeiten.',
+      'Ermöglicht einfaches Mocking in Unit-Tests: Abhängigkeiten können über `app.dependency_overrides` ausgetauscht werden.',
+      'Vermeide redundante Berechtigungsprüfungen in Handlern; Sicherheit gehört in zentrale Dependency-Guards.',
+    ],
+  },
+  'fastapi-17': {
+    name: 'Modulare API-Architektur mit APIRouter',
+    objective: 'Zerlege monolithische APIs in modulare Sub-Router mit Pfad-Präfixen und OpenAPI-Tags.',
+    hint: 'Definiere `router = APIRouter(prefix="/users", tags=["users"])`, erstelle Routen für / und /{user_id} und binde ihn mit `app.include_router(router)` ein.',
+    learning: [
+      'APIRouter gliedert APIs in fachliche Domänen (users, orders, billing) statt einer unübersichtlichen Einzeldatei.',
+      'Interna: `app.include_router` integriert den Routenbaum, stellt Präfixe voran und übernimmt Swagger-Tags.',
+      'Gemeinsame Präfixe und Tags sorgen für saubere URLs und logisch strukturierte Dokumentation in Swagger UI.',
+    ],
+    fieldNotes: [
+      'Platziere jede Domäne in einem eigenen Modul (z. B. routers/users.py) und exportiere die APIRouter-Instanz.',
+      'Router können eigene router-weite Abhängigkeiten deklarieren, die für alle enthaltenen Routen gelten.',
+      'Vermeide doppelte Präfixe in einzelnen Route-Dekoratoren; definiere das Präfix einmalig am APIRouter.',
+    ],
+  },
+  'fastapi-18': {
+    name: 'CORS & Cross-Origin Middleware',
+    objective: 'Konfiguriere CORSMiddleware für sichere browserseitige Cross-Origin-Anfragen und Preflight-OPTIONS-Handling.',
+    hint: 'Binde `CORSMiddleware` via `app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])` ein und erstelle GET /data.',
+    learning: [
+      'Browser erzwingen die Same-Origin Policy (SOP); Web-Apps auf externen Domains benötigen CORS-Header für API-Zugriffe.',
+      'Interna: CORSMiddleware fängt Anfragen ab, beantwortet Preflight-OPTIONS-Checks und fügt Access-Control-Allow-Header an.',
+      'In Produktion sollten erlaubte Origins auf vertrauenswürdige Frontend-Domains beschränkt werden statt Wildcard (*).',
+    ],
+    fieldNotes: [
+      'Preflight-Anfragen nutzen HTTP OPTIONS, um Berechtigungen vor zustandsverändernden Mutationen abzufragen.',
+      'Bei aktiven Anmeldedaten (Cookies/Auth-Header) verbieten Browser aus Sicherheitsgründen die Wildcard * in Origins.',
+      'Platziere CORSMiddleware an äußerster Stelle des Stacks, damit Preflights vor Authentifizierungsprüfungen antworten.',
+    ],
+  },
+  'plumber-05': {
+    name: 'Model Serving & Vorhersage-Endpoints in R',
+    objective: 'Stelle statistische R-Modelle und Machine-Learning-Scoring als performanten POST-Vorhersage-Endpoint bereit.',
+    hint: 'Nutze `#* @post /predict` und `#* @serializer json` an einer Funktion, die `list(prediction = 85.5, status = "scored")` liefert.',
+    learning: [
+      'Plumber transformiert trainierte statistische R-Modelle in produktive Scoring-Microservices.',
+      'Interna: Vorhersage-Endpoints nehmen Merkmale via POST entgegen, rufen predict() auf und serialisieren das Ergebnis.',
+      'Die Annotation `@serializer json` stellt sicher, dass R-Listen als standardkonforme JSON-Objekte serialisiert werden.',
+    ],
+    fieldNotes: [
+      'Lade trainierte Modelle (readRDS("model.rds")) einmalig beim Start des API-Skripts, nicht in jedem Request-Handler.',
+      'Validiere Eingabemerkmale vor Übergabe an die Modellmatrix, um Laufzeitfehler im R-Interpreter zu verhindern.',
+      'Unterstütze Batch-Scoring: Die Vorhersage für Daten-Arrays amortisiert Netzwerklatenzen signifikant.',
+    ],
+  },
 };
 
