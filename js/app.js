@@ -16,7 +16,7 @@ import { launchConfetti, playFanfare } from './confetti.js';
 import { initLocale, getLocale, setLocale, LOCALES, ui } from './i18n/index.js';
 import { loadProgress, saveProgress, summarize } from './progress.js';
 import { buildShareTargets, share, REPO_URL, COFFEE_URL, COFFEE_BUTTON_HTML } from './share.js';
-import { getVisitorCount } from './visitor.js';
+import { getVisitorCount, getCachedVisitorCount } from './visitor.js';
 
 /** @typedef {import('./levels.js').Level} Level */
 
@@ -57,7 +57,7 @@ class App {
     this.offered = false;
     this.activeViz = 'pipeline';
     /** @type {number|null} */
-    this.cachedVisitorCount = 4;
+    this.cachedVisitorCount = null;
     /** @type {import('./terminal.js').LogLine[]} */
     this.log = [];
 
@@ -126,7 +126,7 @@ class App {
               <button type="button" data-action="sandbox" class="ghost">${escapeHtml(u.sandboxBtn)}</button>
               <button type="button" class="help-btn" data-action="help" title="${escapeHtml(u.uiGuideTitle)}" aria-label="${escapeHtml(u.help)}">?</button>
             </div>
-            <span class="tb-stat visitors" id="visitor-stat" title="${escapeHtml(u.visitorsTitle)}">${VISITOR_ICON}<span id="visitor-count">4</span></span>
+            <span class="tb-stat visitors" id="visitor-stat" title="${escapeHtml(u.visitorsTitle)}" hidden>${VISITOR_ICON}<span id="visitor-count">—</span></span>
             <a class="tb-link gh" href="${REPO_URL}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(u.githubTitle)}" aria-label="GitHub">${GITHUB_MARK}</a>
             <a class="tb-link support" href="${COFFEE_URL}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(u.supportTitle)}">${escapeHtml(u.support)}</a>
           </div>
@@ -348,16 +348,16 @@ class App {
   }
 
   async initVisitorCounter() {
-    this.cachedVisitorCount = 4;
+    this.cachedVisitorCount = getCachedVisitorCount();
     this.renderVisitorBadge();
     try {
       const n = await getVisitorCount();
       if (n !== null && Number.isFinite(n)) {
-        this.cachedVisitorCount = Math.max(4, n);
+        this.cachedVisitorCount = n;
         this.renderVisitorBadge();
       }
     } catch {
-      // Fallback count already rendered
+      // offline or blocked: keep the placeholder
     }
   }
 

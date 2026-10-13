@@ -74,7 +74,7 @@ js/
   confetti.js           Confetti particle physics and audio fanfare
   progress.js           Learner progress tracking and persistence
   share.js              Social progress sharing integration
-  visitor.js            Visitor metrics counter
+  visitor.js            Unique visitor counter (server-side count, once per browser)
   i18n/
     index.js            Localization coordinator (LTR / RTL)
     en.js               English copy catalog
@@ -86,6 +86,7 @@ tests/
   game.test.mjs         Game state and action resolution tests
   robustness.test.mjs   Adversarial code parsing and error handling tests
   i18n.test.mjs         Localization key completeness and curriculum checks
+  visitor.test.mjs      Visitor counter behavior with fetch and localStorage mocked
 ```
 
 ## Running Tests

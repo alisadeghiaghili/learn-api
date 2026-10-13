@@ -1,88 +1,148 @@
 /**
- * Visitor counter client with local deduplication and badge SVG parsing.
- * Fetches page visitor count and renders a clean numeric stat in the toolbar.
+ * Unique visitor counter client.
+ *
+ * The number lives only on the server. A browser counts once, ever: a
+ * per-course localStorage flag decides between `hit` (first visit) and `get`
+ * (every later visit). The local cache is a first-paint placeholder and is
+ * always overwritten by the server value.
  */
 
 'use strict';
 
-const STORAGE_KEY = 'learn-api:visitor-count-unique';
-const BADGE_URL = 'https://api.visitorbadge.io/api/combined?path=learn-api-unique';
-const BASE_COUNT = 4;
+export const API_BASE = 'https://abacus.jasoncameron.dev';
+export const NAMESPACE = 'alisadeghiaghili.github.io';
+export const SLUG = 'learn-api';
+export const COUNTER_KEY = `${SLUG}-unique-visitors`;
+export const COUNTED_FLAG_KEY = `${SLUG}:visitor-counted:v1`;
+export const CACHE_KEY = `${SLUG}:visitor-count:v2`;
+export const LEGACY_KEYS = [
+  `${SLUG}:visitor-count-unique`,
+  `${SLUG}:last-visit-date`,
+];
+export const REQUEST_TIMEOUT_MS = 5000;
 
 /**
- * Extracts the numeric visitor count from the visitorbadge SVG payload.
+ * Builds the endpoint URL for a counter action.
  *
- * @param {string} svg
- * @returns {number | null}
+ * @param {'get' | 'hit'} action
+ * @returns {string}
  */
-export function parseVisitorBadgeSvg(svg) {
-  if (!svg || typeof svg !== 'string') return null;
-  const match = svg.match(/VISITORS:\s*([\d.,]+[KMB]?)/i);
-  const raw = (match ? match[1] : '').replace(/,/g, '');
-  if (!raw) return null;
-
-  const suffix = raw.slice(-1).toUpperCase();
-  const scale = { K: 1e3, M: 1e6, B: 1e9 }[suffix] || 1;
-  const numPart = scale > 1 ? raw.slice(0, -1) : raw;
-  const numeric = Number.parseFloat(numPart) * scale;
-  return Number.isFinite(numeric) && numeric >= 0 ? Math.round(numeric) : null;
+export function counterUrl(action) {
+  return `${API_BASE}/${action}/${NAMESPACE}/${COUNTER_KEY}`;
 }
 
 /**
- * Retrieves the unique visitor count, incrementing on the first visit per browser,
- * while returning cached count on subsequent visits to count unique visitors only.
- * Always ensures the displayed count starts from at least 4.
+ * Removes every key this course used for earlier counter versions.
  *
+ * @returns {void}
+ */
+export function removeLegacyKeys() {
+  try {
+    for (const key of LEGACY_KEYS) localStorage.removeItem(key);
+  } catch {
+    // storage unavailable
+  }
+}
+
+/**
+ * Reads the placeholder count used for the first paint only.
+ *
+ * @returns {number | null}
+ */
+export function getCachedVisitorCount() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const cached = JSON.parse(raw);
+    if (Number.isInteger(cached?.count) && cached.count >= 0) return cached.count;
+  } catch {
+    // unreadable cache is ignored
+  }
+  return null;
+}
+
+function cacheCount(count) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ count, at: Date.now() }));
+  } catch {
+    // storage unavailable
+  }
+}
+
+/**
+ * Calls the counter API and returns the integer value.
+ * A 404 on `get` means the key does not exist yet and reads as 0.
+ *
+ * @param {'get' | 'hit'} action
  * @returns {Promise<number>}
  */
-export async function getVisitorCount() {
-  // Check local cache first: if this browser has already been counted,
-  // return the cached count immediately WITHOUT fetching from the server.
-  // This ensures each user is counted only once and page reloads never inflate the count.
+async function request(action) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const cached = JSON.parse(raw);
-      if (typeof cached?.count === 'number' && Number.isFinite(cached.count)) {
-        return Math.max(BASE_COUNT, cached.count);
-      }
-    }
-  } catch {
-    // LocalStorage may fail in restricted private browsing
-  }
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
-
-    const res = await fetch(BADGE_URL, {
+    const res = await fetch(counterUrl(action), {
       cache: 'no-store',
       signal: controller.signal,
-      headers: {
-        Accept: 'image/svg+xml, */*',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
+      headers: { Accept: 'application/json' },
     });
-    clearTimeout(timeoutId);
-
-    if (!res.ok) return BASE_COUNT;
-
-    const svg = await res.text();
-    const parsed = parseVisitorBadgeSvg(svg);
-
-    const count = parsed !== null ? Math.max(BASE_COUNT, parsed + BASE_COUNT - 1) : BASE_COUNT;
-
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ count, at: Date.now() })
-      );
-    } catch {
-      // quota or private mode
+    if (action === 'get' && res.status === 404) return 0;
+    if (!res.ok) throw new Error(`counter ${action} failed: ${res.status}`);
+    const data = await res.json();
+    if (!Number.isInteger(data?.value) || data.value < 0) {
+      throw new Error('counter response has no valid value');
     }
-
-    return count;
-  } catch {
-    return BASE_COUNT;
+    return data.value;
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+/**
+ * Marks this browser as counted. Returns false when storage is unusable.
+ *
+ * @returns {boolean}
+ */
+function markCounted() {
+  try {
+    if (localStorage.getItem(COUNTED_FLAG_KEY)) return false;
+    localStorage.setItem(COUNTED_FLAG_KEY, new Date().toISOString());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function clearCounted() {
+  try {
+    localStorage.removeItem(COUNTED_FLAG_KEY);
+  } catch {
+    // storage unavailable
+  }
+}
+
+/**
+ * Resolves the visitor count shown to the user. Increments at most once per
+ * browser. Resolves to null when the server cannot be reached at all.
+ *
+ * @returns {Promise<number | null>}
+ */
+export async function getVisitorCount() {
+  removeLegacyKeys();
+  let value = null;
+  if (markCounted()) {
+    try {
+      value = await request('hit');
+    } catch {
+      clearCounted();
+    }
+  }
+  if (value === null) {
+    try {
+      value = await request('get');
+    } catch {
+      return null;
+    }
+  }
+  cacheCount(value);
+  return value;
 }
